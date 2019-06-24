@@ -120,3 +120,4 @@ src/data/pairs.txt
 models/*.json
 models/*.params
 
+RetinaFace/trainimages

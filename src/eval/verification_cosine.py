@@ -210,7 +210,7 @@ def test_badcase(data_set, mx_model, batch_size, name='', data_extra=None, label
         _label = nd.ones((batch_size,))
     else:
         _label = nd.ones(label_shape)
-    for i in xrange(len(data_list)):
+    for i in range(len(data_list)):
         data = data_list[i]
         embeddings = None
         ba = 0
@@ -377,7 +377,7 @@ def test_badcase(data_set, mx_model, batch_size, name='', data_extra=None, label
                 #  imgb = cv2.transpose(imgb)
                 #  imgb = cv2.flip(imgb, 0)
                 # else:
-                #  for ii in xrange(2):
+                #  for ii in range(2):
                 #    imgb = cv2.transpose(imgb)
                 #    imgb = cv2.flip(imgb, 1)
             dist = out[2]
@@ -428,7 +428,7 @@ def cal_global_mode2(data_set, mx_model, threshold, batch_size):
     time_consumed = 0.0
     _label = nd.ones((batch_size,))
 
-    for i in xrange(len(data_list)):
+    for i in range(len(data_list)):
         data = data_list[i]
         embeddings = None
         ba = 0
