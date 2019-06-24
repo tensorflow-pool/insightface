@@ -117,3 +117,6 @@ src/eval/*.bin
 src/data/asia*
 src/data/pairs.txt
 
+models/*.json
+models/*.params
+
