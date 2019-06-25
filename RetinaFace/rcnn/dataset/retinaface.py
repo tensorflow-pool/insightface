@@ -104,7 +104,7 @@ class retinaface(IMDB):
                     continue
 
                 boxes[ix, :] = np.array([x1, y1, x2, y2], np.float)
-                if self._split == 'train':
+                if 'train' in self._split and False:
                     landmark = np.array(values[4:19], dtype=np.float32).reshape((5, 3))
                     for li in range(5):
                         # print(landmark)
@@ -133,7 +133,7 @@ class retinaface(IMDB):
                 ix += 1
             max_num_boxes = max(max_num_boxes, ix)
             # overlaps = scipy.sparse.csr_matrix(overlaps)
-            if self._split == 'train' and ix == 0:
+            if 'train' in self._split and ix == 0:
                 continue
             boxes = boxes[:ix, :]
             landmarks = landmarks[:ix, :, :]

@@ -1,4 +1,5 @@
 import mxnet as mx
+import gluoncv
 mnist = mx.test_utils.get_mnist()
 
 # Fix the seed

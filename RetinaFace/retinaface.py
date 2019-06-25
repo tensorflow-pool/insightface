@@ -201,9 +201,13 @@ class RetinaFace:
                     print('X3 uses', diff.total_seconds(), 'seconds')
                 self.model.forward(db, is_train=False)
                 net_out = self.model.get_outputs()
+                net_out_np = [a.asnumpy() for a in net_out]
                 # post_nms_topN = self._rpn_post_nms_top_n
                 # min_size_dict = self._rpn_min_size_fpn
-
+                if self.debug:
+                    timeb = datetime.datetime.now()
+                    diff = timeb - timea
+                    print('forward uses', diff.total_seconds(), 'seconds')
                 for _idx, s in enumerate(self._feat_stride_fpn):
                     # if len(scales)>1 and s==32 and im_scale==scales[-1]:
                     #  continue

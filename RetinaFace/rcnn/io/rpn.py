@@ -648,7 +648,8 @@ class AA:
         #print('AAA',argmax_overlaps)
         a_landmarks = gt_landmarks[argmax_overlaps,:,:]
         landmark_targets[:] = landmark_transform(anchors, a_landmarks)
-        invalid = np.where(a_landmarks[:,0,2]<0.0)[0]
+        # landmark 不存在就是0，存在为1
+        invalid = np.where(a_landmarks[:,0,2]<=0.0)[0]
         #assert len(invalid)==0
         #landmark_weights[invalid, :] = np.array(config.TRAIN.RPN_INVALID_LANDMARK_WEIGHTS)
         landmark_weights[invalid, :] = 0.0
