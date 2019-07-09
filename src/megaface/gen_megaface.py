@@ -19,18 +19,22 @@ import face_preprocess
 import mxnet as mx
 
 # from caffe.proto import caffe_pb2
+g_megaface_lst = os.path.expanduser("~/datasets/mega/mega_distractors/aligned_112/lst")
+# facescrub_lst = "/raid5data/dplearn/faceinsight_align_facescrub.lst"
+g_facescrub_lst = os.path.expanduser("~/datasets/mega/mega_facescrub/facescrub_aligned_112/lst")
 
-megaface_out = '/home/lijc08/datasets/megaface_customer_features/MegaFace_Features'
+megaface_out = os.path.expanduser('~/datasets/mega/features_{}/MegaFace_Features')
 # facescrub_out = '/raid5data/dplearn/megaface/FaceScrubSubset_Features'
-facescrub_out = '/home/lijc08/datasets/megaface_customer_features/FaceScrub_Features'
+facescrub_out = os.path.expanduser('~/datasets/mega/features_{}/FaceScrub_Features')
 
 
 def do_flip(data):
-    for idx in xrange(data.shape[0]):
+    for idx in range(data.shape[0]):
         data[idx, :, :] = np.fliplr(data[idx, :, :])
 
 
 def get_feature(image_path, bbox, landmark, nets, image_shape, use_align, aligned, use_mean):
+    # print("image_path:", image_path)
     img = face_preprocess.read_image(image_path, mode='rgb')
     # print(img.shape)
     if img is None:
@@ -122,11 +126,11 @@ def main(args):
         nets.append(net)
 
     # megaface_lst = "/raid5data/dplearn/faceinsight_align_megaface.lst"
-    megaface_lst = "/home/lijc08/datasets/mega/aligned_112/lst"
+    megaface_lst = g_megaface_lst
     # facescrub_lst = "/raid5data/dplearn/faceinsight_align_facescrub.lst"
-    facescrub_lst = "/home/lijc08/datasets/mega_facescrub/facescrub_aligned_112/lst"
+    facescrub_lst = g_facescrub_lst
     if args.fsall > 0:
-        facescrub_lst = "/home/lijc08/datasets/mega_facescrub/facescrub_aligned_112/lst"
+        facescrub_lst = g_facescrub_lst
 
     if args.skip == 0:
         i = 0
@@ -140,7 +144,7 @@ def main(args):
             a, b = _path[-2], _path[-1]
             # a = a.replace(' ', '_')
             # b = b.replace(' ', '_')
-            out_dir = os.path.join(facescrub_out, a)
+            out_dir = os.path.join(facescrub_out.format(args.algo), a)
             if not os.path.exists(out_dir):
                 os.makedirs(out_dir)
             # file, ext = os.path.splitext(b)
@@ -189,7 +193,7 @@ def main(args):
         assert aligned == True
         _path = image_path.split('/')
         a1, a2, b = _path[-3], _path[-2], _path[-1]
-        out_dir = os.path.join(megaface_out, a1, a2)
+        out_dir = os.path.join(megaface_out.format(args.algo), a1, a2)
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
             # continue
@@ -216,13 +220,13 @@ def parse_arguments(argv):
     parser.add_argument('--concat', type=int, help='', default=0)
     parser.add_argument('--fsall', type=int, help='', default=0)
     parser.add_argument('--mf', type=int, help='', default=0)
-    parser.add_argument('--algo', type=str, help='', default='maysa')
+    parser.add_argument('--algo', type=str, help='', default='r100')
     # parser.add_argument('--model', type=str, help='', default='../model/sphereface-20-p0_0_96_112_0,22|../model/sphereface-20-p0_0_96_95_0,21|../model/sphereface-20-p0_0_80_95_0,21')
     # parser.add_argument('--model', type=str, help='', default='../model/sphereface-s60-p0_0_96_112_0,31|../model/sphereface-s60-p0_0_96_95_0,21|../model/sphereface2-s60-p0_0_96_112_0,21|../model/sphereface3-s60-p0_0_96_95_0,23')
     # parser.add_argument('--model', type=str, help='', default='../model/sphereface-s60-p0_0_96_112_0,31|../model/sphereface-s60-p0_0_96_95_0,21|../model/sphereface2-s60-p0_0_96_112_0,21|../model/sphereface3-s60-p0_0_96_95_0,23|../model/sphereface-20-p0_0_96_112_0,22|../model/sphereface-20-p0_0_96_95_0,21|../model/sphereface-20-p0_0_80_95_0,21')
     # parser.add_argument('--model', type=str, help='', default='../model/spherefacei-s60-p0_0_96_112_0,135')
     # parser.add_argument('--model', type=str, help='', default='../model/spherefacei-s60-p0_0_96_95_0,95')
-    parser.add_argument('--model', type=str, help='', default='/home/lijc08/insightface/model-r100-ii/model,0')
+    parser.add_argument('--model', type=str, help='', default=os.path.expanduser('~/deeplearning/insightface/models/model-r100-ii/model,0'))
     return parser.parse_args(argv)
 
 
