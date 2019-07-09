@@ -129,8 +129,6 @@ def main(args):
     megaface_lst = g_megaface_lst
     # facescrub_lst = "/raid5data/dplearn/faceinsight_align_facescrub.lst"
     facescrub_lst = g_facescrub_lst
-    if args.fsall > 0:
-        facescrub_lst = g_facescrub_lst
 
     if args.skip == 0:
         i = 0
@@ -179,47 +177,46 @@ def main(args):
         print('fs stat', i, succ)
 
     # return
-    if args.mf == 0:
-        return
-    i = 0
-    succ = 0
-    for line in open(megaface_lst, 'r'):
-        if i % 1000 == 0:
-            print("writing mf", i, succ)
-        i += 1
-        if i <= args.skip:
-            continue
-        image_path, label, bbox, landmark, aligned = face_preprocess.parse_lst_line(line)
-        assert aligned == True
-        _path = image_path.split('/')
-        a1, a2, b = _path[-3], _path[-2], _path[-1]
-        out_dir = os.path.join(megaface_out.format(args.algo), a1, a2)
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
-            # continue
-        # print(landmark)
-        feature = get_feature(image_path, bbox, landmark, nets, image_shape, True, aligned, args.mean)
-        if feature is None:
-            continue
-        out_path = os.path.join(out_dir, b + "_%s_%dx%d.bin" % (args.algo, image_shape[1], image_shape[2]))
-        # print(out_path)
-        write_bin(out_path, feature)
-        succ += 1
-    print('mf stat', i, succ)
+    if args.mf != 0:
+        i = 0
+        succ = 0
+        for line in open(megaface_lst, 'r'):
+            if i % 1000 == 0:
+                print("writing mf", i, succ)
+            i += 1
+            if i <= args.skip:
+                continue
+            image_path, label, bbox, landmark, aligned = face_preprocess.parse_lst_line(line)
+            assert aligned == True
+            _path = image_path.split('/')
+            a1, a2, b = _path[-3], _path[-2], _path[-1]
+            out_dir = os.path.join(megaface_out.format(args.algo), a1, a2)
+            if not os.path.exists(out_dir):
+                os.makedirs(out_dir)
+                # continue
+            # print(landmark)
+            feature = get_feature(image_path, bbox, landmark, nets, image_shape, True, aligned, args.mean)
+            if feature is None:
+                continue
+            out_path = os.path.join(out_dir, b + "_%s_%dx%d.bin" % (args.algo, image_shape[1], image_shape[2]))
+            # print(out_path)
+            write_bin(out_path, feature)
+            succ += 1
+        print('mf stat', i, succ)
 
 
 def parse_arguments(argv):
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--batch_size', type=int, help='', default=100)
     parser.add_argument('--image_size', type=str, help='', default='3,112,112')
     parser.add_argument('--gpu', type=int, help='', default=0)
     parser.add_argument('--mean', type=int, help='', default=0)
-    parser.add_argument('--seed', type=int, help='', default=727)
+
+    parser.add_argument('--scrub', type=int, help='', default=0)
+
+    parser.add_argument('--mf', type=int, help='', default=1)
     parser.add_argument('--skip', type=int, help='', default=0)
-    parser.add_argument('--concat', type=int, help='', default=0)
-    parser.add_argument('--fsall', type=int, help='', default=0)
-    parser.add_argument('--mf', type=int, help='', default=0)
+
     parser.add_argument('--algo', type=str, help='', default='r100')
     # parser.add_argument('--model', type=str, help='', default='../model/sphereface-20-p0_0_96_112_0,22|../model/sphereface-20-p0_0_96_95_0,21|../model/sphereface-20-p0_0_80_95_0,21')
     # parser.add_argument('--model', type=str, help='', default='../model/sphereface-s60-p0_0_96_112_0,31|../model/sphereface-s60-p0_0_96_95_0,21|../model/sphereface2-s60-p0_0_96_112_0,21|../model/sphereface3-s60-p0_0_96_95_0,23')
