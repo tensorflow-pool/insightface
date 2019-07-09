@@ -18,14 +18,11 @@ import face_preprocess
 # import lfw
 import mxnet as mx
 
-# from caffe.proto import caffe_pb2
-g_megaface_lst = os.path.expanduser("~/datasets/mega/mega_distractors/aligned_112/lst")
-# facescrub_lst = "/raid5data/dplearn/faceinsight_align_facescrub.lst"
 g_facescrub_lst = os.path.expanduser("~/datasets/mega/mega_facescrub/facescrub_aligned_112/lst")
+g_megaface_lst = os.path.expanduser("~/datasets/mega/mega_distractors/aligned_112/lst")
 
-megaface_out = os.path.expanduser('~/datasets/mega/features_{}/MegaFace_Features')
-# facescrub_out = '/raid5data/dplearn/megaface/FaceScrubSubset_Features'
 facescrub_out = os.path.expanduser('~/datasets/mega/features_{}/FaceScrub_Features')
+megaface_out = os.path.expanduser('~/datasets/mega/features_{}/MegaFace_Features')
 
 
 def do_flip(data):
@@ -130,7 +127,7 @@ def main(args):
     # facescrub_lst = "/raid5data/dplearn/faceinsight_align_facescrub.lst"
     facescrub_lst = g_facescrub_lst
 
-    if args.skip == 0:
+    if args.scrub != 0:
         i = 0
         succ = 0
         for line in open(facescrub_lst, 'r'):
@@ -214,7 +211,7 @@ def parse_arguments(argv):
 
     parser.add_argument('--scrub', type=int, help='', default=0)
 
-    parser.add_argument('--mf', type=int, help='', default=1)
+    parser.add_argument('--mf', type=int, help='', default=0)
     parser.add_argument('--skip', type=int, help='', default=0)
 
     parser.add_argument('--algo', type=str, help='', default='r100')
