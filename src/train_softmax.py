@@ -102,7 +102,7 @@ def parse_args():
     parser.add_argument('--ckpt', type=int, default=2,
                         help='checkpoint saving option. 0: discard saving. 1: save when necessary. 2: always save')
     parser.add_argument('--loss-type', type=int, default=5, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b')
-    parser.add_argument('--verbose', type=int, default=50,
+    parser.add_argument('--check_save', type=int, default=4000,
                         help='do verification testing and model saving every verbose batches')
     parser.add_argument('--max-steps', type=int, default=0, help='max training batches')
     parser.add_argument('--end-epoch', type=int, default=100000, help='training epoch size.')
@@ -559,7 +559,7 @@ def train_net(args):
         sw.add_scalar(tag='acc', value=acc, global_step=mbatch)
         sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
 
-        if mbatch % 10000 == 0:
+        if mbatch % args.check_save == 0:
             acc_list = ver_test(mbatch)
             logging.info('[%d]Accuracy-Highest: %1.5f' % (mbatch, acc_list))
             sw.add_scalar(tag='acc', value=acc_list[0], global_step=global_step[0])
