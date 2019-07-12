@@ -85,9 +85,9 @@ class LossValueMetric(mx.metric.EvalMetric):
 def parse_args():
     parser = argparse.ArgumentParser(description='Train face network')
     # general
-    parser.add_argument('--data-dir', default='~/datasets/glintasia/faces_glintasia', help='training set directory')
-    parser.add_argument('--prefix', default='../model-r100-ii/model', help='directory to save model.')
-    parser.add_argument('--pretrained', default='', help='pretrained model to load')
+    parser.add_argument('--data-dir', default='~/datasets/glintasia', help='training set directory')
+    parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
+    parser.add_argument('--pretrained', default='../models/model-r100-ii/model,0', help='pretrained model to load')
     parser.add_argument('--ckpt', type=int, default=2,
                         help='checkpoint saving option. 0: discard saving. 1: save when necessary. 2: always save')
     parser.add_argument('--loss-type', type=int, default=5, help='loss type')
@@ -113,7 +113,7 @@ def parse_args():
     parser.add_argument('--bn-mom', type=float, default=0.9, help='bn mom')
     parser.add_argument('--mom', type=float, default=0.9, help='momentum')
     parser.add_argument('--emb-size', type=int, default=512, help='embedding length')
-    parser.add_argument('--per-batch-size', type=int, default=32, help='batch size in each context')
+    parser.add_argument('--per-batch-size', type=int, default=4, help='batch size in each context')
     parser.add_argument('--margin-m', type=float, default=0.3, help='margin for loss')
     parser.add_argument('--margin-s', type=float, default=64.0, help='scale for feature')
     parser.add_argument('--margin-a', type=float, default=1.0, help='')
@@ -130,7 +130,7 @@ def parse_args():
     parser.add_argument('--cutoff', type=int, default=0, help='cut off aug')
     parser.add_argument('--color', type=int, default=0, help='color jittering aug')
     parser.add_argument('--images-filter', type=int, default=0, help='minimum images per identity filter')
-    parser.add_argument('--target', type=str, default='lfw,cfp_ff,agedb_30', help='verification targets')
+    parser.add_argument('--target', type=str, default='', help='verification targets')
     parser.add_argument('--ce-loss', default=False, action='store_true', help='if output ce loss')
     args = parser.parse_args()
     return args
@@ -378,20 +378,8 @@ def train_net(args):
     args.data_dir = os.path.expanduser(args.data_dir)
     args.pretrained = os.path.expanduser(args.pretrained)
 
-    ctx = []
-    if os.environ.has_key('CUDA_VISIBLE_DEVICES'):
-        cvd = os.environ['CUDA_VISIBLE_DEVICES'].strip()
-        if len(cvd) > 0:
-            for i in xrange(len(cvd.split(','))):
-                ctx.append(mx.gpu(i))
-        if len(ctx) == 0:
-            ctx = [mx.cpu()]
-            print('use cpu')
-        else:
-            print('gpu num:', len(ctx))
-    else:
-        ctx = [mx.gpu()]
-        print('use gpu0')
+    ctx = [mx.gpu()]
+    print('use gpu0')
 
     prefix = args.prefix
     prefix_dir = os.path.dirname(prefix)
@@ -501,7 +489,7 @@ def train_net(args):
 
     def ver_test(nbatch):
         results = []
-        for i in xrange(len(ver_list)):
+        for i in range(len(ver_list)):
             acc1, std1, acc2, std2, xnorm, embeddings_list = verification.test(ver_list[i], model, args.batch_size, 10,
                                                                                None, None)
             print('[%s][%d]XNorm: %f' % (ver_name_list[i], nbatch, xnorm))
@@ -511,7 +499,7 @@ def train_net(args):
         return results
 
     highest_acc = [0.0, 0.0]  # lfw and target
-    # for i in xrange(len(ver_list)):
+    # for i in range(len(ver_list)):
     #  highest_acc.append(0.0)
     global_step = [0]
     save_step = [0]
@@ -520,7 +508,7 @@ def train_net(args):
         if args.loss_type >= 1 and args.loss_type <= 7:
             lr_steps = [100000, 140000, 160000]
         p = 512.0 / args.batch_size
-        for l in xrange(len(lr_steps)):
+        for l in range(len(lr_steps)):
             lr_steps[l] = int(lr_steps[l])
             # lr_steps[l] = int(lr_steps[l] * p)
     else:

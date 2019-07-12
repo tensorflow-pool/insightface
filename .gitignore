@@ -109,6 +109,7 @@ exam/agedb*
 exam/lfw*
 exam/face*
 exam/glint*
+exam/images*
 
 src/eval/badcases*
 src/eval/*.bin
