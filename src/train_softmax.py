@@ -106,7 +106,7 @@ def parse_args():
                         help='do verification testing and model saving every verbose batches')
     parser.add_argument('--max-steps', type=int, default=0, help='max training batches')
     parser.add_argument('--end-epoch', type=int, default=100000, help='training epoch size.')
-    parser.add_argument('--network', default='r100', help='specify network')
+    parser.add_argument('--network', default='r34', help='specify network')
     parser.add_argument('--image-size', default='112,112', help='specify input image height and width')
     parser.add_argument('--version-se', type=int, default=0, help='whether to use se in network')
     parser.add_argument('--version-input', type=int, default=1, help='network input config 1代表第一次卷积7x7-2改为3x3-1')
