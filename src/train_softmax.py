@@ -562,7 +562,7 @@ def train_net(args):
 
         if mbatch % args.check_save == 0:
             acc_list = ver_test(mbatch)
-            logging.info('[%d]Accuracy-Highest: %1.5f' % (mbatch, acc_list))
+            logging.info('[%d]Accuracy-Highest: %s' % (mbatch, acc_list))
             sw.add_scalar(tag='acc', value=acc_list[0], global_step=global_step[0])
 
             logging.info('saving %s', mbatch)
