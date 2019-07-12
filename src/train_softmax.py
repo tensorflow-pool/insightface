@@ -98,8 +98,8 @@ def parse_args():
     # general
     parser.add_argument('--data-dir', default='~/datasets/glintasia', help='training set directory')
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
-    # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='../models/model-r34-amf/model,0', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
+    # parser.add_argument('--pretrained', default='../models/model-r34-amf/model,0', help='pretrained model to load')
     parser.add_argument('--ckpt', type=int, default=2,
                         help='checkpoint saving option. 0: discard saving. 1: save when necessary. 2: always save')
     parser.add_argument('--loss-type', type=int, default=5, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b')
