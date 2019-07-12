@@ -98,7 +98,8 @@ def parse_args():
     # general
     parser.add_argument('--data-dir', default='~/datasets/glintasia', help='training set directory')
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
-    parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
+    # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='../models/model-r34-amf/model,0', help='pretrained model to load')
     parser.add_argument('--ckpt', type=int, default=2,
                         help='checkpoint saving option. 0: discard saving. 1: save when necessary. 2: always save')
     parser.add_argument('--loss-type', type=int, default=5, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b')
@@ -115,7 +116,7 @@ def parse_args():
     parser.add_argument('--version-multiplier', type=float, default=1.0, help='filters multiplier')
     parser.add_argument('--version-act', type=str, default='prelu', help='network activation config')
     parser.add_argument('--use-deformable', type=int, default=0, help='use deformable cnn in network')
-    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
+    parser.add_argument('--lr', type=float, default=0.02, help='start learning rate')
     parser.add_argument('--lr-steps', type=str, default='', help='steps of lr changing')
     parser.add_argument('--wd', type=float, default=0.0005, help='weight decay')
     parser.add_argument('--fc7-wd-mult', type=float, default=1.0, help='weight decay mult for fc7')
