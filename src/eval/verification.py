@@ -222,14 +222,14 @@ def evaluate(embeddings, actual_issame, nrof_folds=10, pca=0, dis_type=1):
 
 
 def load_bin(path, image_size):
-    bins, issame_list = pickle.load(open(path, 'rb'))
+    bins, issame_list = pickle.load(open(path, 'rb'), encoding='bytes')
     # bins = bins[:2000]
     # issame_list = issame_list[:1000]
     data_list = []
     for flip in [0, 1]:
         data = nd.empty((len(issame_list) * 2, 3, image_size[0], image_size[1]))
         data_list.append(data)
-    for i in xrange(len(issame_list) * 2):
+    for i in range(len(issame_list) * 2):
         _bin = bins[i]
         img = mx.image.imdecode(_bin)
         if img.shape[1] != image_size[0]:
@@ -260,7 +260,7 @@ def test(data_set, mx_model, batch_size, nfolds=10, data_extra=None, label_shape
         _label = nd.ones((batch_size,))
     else:
         _label = nd.ones(label_shape)
-    for i in xrange(len(data_list)):
+    for i in range(len(data_list)):
         data = data_list[i]
         embeddings = None
         ba = 0
@@ -306,7 +306,7 @@ def test(data_set, mx_model, batch_size, nfolds=10, data_extra=None, label_shape
     print(len(embeddings_list))
     for embed in embeddings_list:
         print(embed.shape)
-        for i in xrange(embed.shape[0]):
+        for i in range(embed.shape[0]):
             _em = embed[i]
             _norm = np.linalg.norm(_em)
             # print(_em.shape, _norm)
@@ -364,7 +364,7 @@ def test_badcase(data_set, mx_model, batch_size, name='', data_extra=None, label
         _label = nd.ones((batch_size,))
     else:
         _label = nd.ones(label_shape)
-    for i in xrange(len(data_list)):
+    for i in range(len(data_list)):
         data = data_list[i]
         embeddings = None
         ba = 0
@@ -515,7 +515,7 @@ def test_badcase(data_set, mx_model, batch_size, name='', data_extra=None, label
                 #  imgb = cv2.transpose(imgb)
                 #  imgb = cv2.flip(imgb, 0)
                 # else:
-                #  for ii in xrange(2):
+                #  for ii in range(2):
                 #    imgb = cv2.transpose(imgb)
                 #    imgb = cv2.flip(imgb, 1)
             dist = out[2]
@@ -548,7 +548,7 @@ def dumpR(data_set, mx_model, batch_size, name='', data_extra=None, label_shape=
         _label = nd.ones((batch_size,))
     else:
         _label = nd.ones(label_shape)
-    for i in xrange(len(data_list)):
+    for i in range(len(data_list)):
         data = data_list[i]
         embeddings = None
         ba = 0
@@ -666,7 +666,7 @@ if __name__ == '__main__':
 
     if args.mode == 0:
         ver_list, ver_name_list = get_datas()
-        for i in xrange(len(ver_list)):
+        for i in range(len(ver_list)):
             results = []
             for model in nets:
                 acc1, std1, acc2, std2, xnorm, embeddings_list = test(ver_list[i], model, args.batch_size, args.nfolds)

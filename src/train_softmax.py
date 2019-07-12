@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -30,13 +31,8 @@ import fdpn
 import fnasnet
 import spherenet
 import verification
-
-# sys.path.append(os.path.join(os.path.dirname(__file__), 'losses'))
-# import center_loss
-
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+import time
+from mxboard import SummaryWriter
 
 args = None
 
@@ -90,17 +86,17 @@ def parse_args():
     parser.add_argument('--pretrained', default='../models/model-r100-ii/model,0', help='pretrained model to load')
     parser.add_argument('--ckpt', type=int, default=2,
                         help='checkpoint saving option. 0: discard saving. 1: save when necessary. 2: always save')
-    parser.add_argument('--loss-type', type=int, default=5, help='loss type')
-    parser.add_argument('--verbose', type=int, default=2000,
+    parser.add_argument('--loss-type', type=int, default=5, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b')
+    parser.add_argument('--verbose', type=int, default=50,
                         help='do verification testing and model saving every verbose batches')
     parser.add_argument('--max-steps', type=int, default=0, help='max training batches')
     parser.add_argument('--end-epoch', type=int, default=100000, help='training epoch size.')
     parser.add_argument('--network', default='r100', help='specify network')
     parser.add_argument('--image-size', default='112,112', help='specify input image height and width')
     parser.add_argument('--version-se', type=int, default=0, help='whether to use se in network')
-    parser.add_argument('--version-input', type=int, default=1, help='network input config')
-    parser.add_argument('--version-output', type=str, default='E', help='network embedding output config')
-    parser.add_argument('--version-unit', type=int, default=3, help='resnet unit config')
+    parser.add_argument('--version-input', type=int, default=1, help='network input config 1代表第一次卷积7x7-2改为3x3-1')
+    parser.add_argument('--version-output', type=str, default='E', help='network embedding output config e代表的是bn-drop-fc-bn结构')
+    parser.add_argument('--version-unit', type=int, default=3, help='resnet unit config 3代表的是arc论文中对残差网络单元的修改，增加了更多bn和prelu')
     parser.add_argument('--version-multiplier', type=float, default=1.0, help='filters multiplier')
     parser.add_argument('--version-act', type=str, default='prelu', help='network activation config')
     parser.add_argument('--use-deformable', type=int, default=0, help='use deformable cnn in network')
@@ -113,7 +109,7 @@ def parse_args():
     parser.add_argument('--bn-mom', type=float, default=0.9, help='bn mom')
     parser.add_argument('--mom', type=float, default=0.9, help='momentum')
     parser.add_argument('--emb-size', type=int, default=512, help='embedding length')
-    parser.add_argument('--per-batch-size', type=int, default=4, help='batch size in each context')
+    parser.add_argument('--per-batch-size', type=int, default=32, help='batch size in each context')
     parser.add_argument('--margin-m', type=float, default=0.3, help='margin for loss')
     parser.add_argument('--margin-s', type=float, default=64.0, help='scale for feature')
     parser.add_argument('--margin-a', type=float, default=1.0, help='')
@@ -130,7 +126,7 @@ def parse_args():
     parser.add_argument('--cutoff', type=int, default=0, help='cut off aug')
     parser.add_argument('--color', type=int, default=0, help='color jittering aug')
     parser.add_argument('--images-filter', type=int, default=0, help='minimum images per identity filter')
-    parser.add_argument('--target', type=str, default='', help='verification targets')
+    parser.add_argument('--target', type=str, default='cfp_fp', help='verification targets')
     parser.add_argument('--ce-loss', default=False, action='store_true', help='if output ce loss')
     args = parser.parse_args()
     return args
@@ -201,8 +197,8 @@ def get_symbol(args, arg_params, aux_params):
         fc7 = mx.sym.LSoftmax(data=embedding, label=gt_label, num_hidden=args.num_classes,
                               weight=_weight,
                               beta=args.beta, margin=args.margin, scale=args.scale,
-                              beta_min=args.beta_min, verbose=1000, name='fc7')
-    elif args.loss_type == 2:
+                              beta_min=args.beta_min, verbose=2000, name='fc7')
+    elif args.loss_type == 2:  # cos
         s = args.margin_s
         m = args.margin_m
         assert (s > 0.0)
@@ -214,7 +210,7 @@ def get_symbol(args, arg_params, aux_params):
         s_m = s * m
         gt_one_hot = mx.sym.one_hot(gt_label, depth=args.num_classes, on_value=s_m, off_value=0.0)
         fc7 = fc7 - gt_one_hot
-    elif args.loss_type == 4:
+    elif args.loss_type == 4:  # arc
         s = args.margin_s
         m = args.margin_m
         assert s > 0.0
@@ -375,20 +371,32 @@ def get_symbol(args, arg_params, aux_params):
 
 
 def train_net(args):
+    prefix = time.strftime("%Y-%m-%d-%H:%M:%S")
+    file_path = "train/models_{}".format(prefix)
+    if not os.path.exists(file_path):
+        os.makedirs(file_path)
+
+    sw = SummaryWriter(logdir=file_path)
+    logging.basicConfig()
+    logging.getLogger().setLevel(logging.INFO)
+    fh = logging.FileHandler("{}/train.log".format(file_path))
+    # create formatter#
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    # add formatter to ch
+    fh.setFormatter(formatter)
+    logging.getLogger().addHandler(fh)
+    prefix = file_path
+
     args.data_dir = os.path.expanduser(args.data_dir)
     args.pretrained = os.path.expanduser(args.pretrained)
 
     ctx = [mx.gpu()]
-    print('use gpu0')
+    logging.info('use gpu0')
 
-    prefix = args.prefix
-    prefix_dir = os.path.dirname(prefix)
-    if not os.path.exists(prefix_dir):
-        os.makedirs(prefix_dir)
     end_epoch = args.end_epoch
     args.ctx_num = len(ctx)
     args.num_layers = int(args.network[1:])
-    print('num_layers', args.num_layers)
+    logging.info('num_layers %s', args.num_layers)
     if args.per_batch_size == 0:
         args.per_batch_size = 128
     args.batch_size = args.per_batch_size * args.ctx_num
@@ -409,16 +417,16 @@ def train_net(args):
     assert image_size[0] == image_size[1]
     args.image_h = image_size[0]
     args.image_w = image_size[1]
-    print('image_size', image_size)
+    logging.info('image_size %s', image_size)
     assert (args.num_classes > 0)
-    print('num_classes', args.num_classes)
+    logging.info('num_classes %s', args.num_classes)
     path_imgrec = os.path.join(data_dir, "train.rec")
 
     if args.loss_type == 1 and args.num_classes > 20000:
         args.beta_freeze = 5000
         args.gamma = 0.06
 
-    print('Called with argument:', args)
+    logging.info('Called with argument: %s', args)
     data_shape = (args.image_channel, image_size[0], image_size[1])
     mean = None
 
@@ -435,7 +443,7 @@ def train_net(args):
             spherenet.init_weights(sym, data_shape_dict, args.num_layers)
     else:
         vec = args.pretrained.split(',')
-        print('loading', vec)
+        logging.info('loading %s', vec)
         sym, arg_params, aux_params = mx.model.load_checkpoint(vec[0], int(vec[1]))
         sym, arg_params, aux_params = get_symbol(args, arg_params, aux_params)
 
@@ -485,16 +493,16 @@ def train_net(args):
             data_set = verification.load_bin(path, image_size)
             ver_list.append(data_set)
             ver_name_list.append(name)
-            print('ver', name)
+            logging.info('ver %s', name)
 
     def ver_test(nbatch):
         results = []
         for i in range(len(ver_list)):
             acc1, std1, acc2, std2, xnorm, embeddings_list = verification.test(ver_list[i], model, args.batch_size, 10,
                                                                                None, None)
-            print('[%s][%d]XNorm: %f' % (ver_name_list[i], nbatch, xnorm))
-            # print('[%s][%d]Accuracy: %1.5f+-%1.5f' % (ver_name_list[i], nbatch, acc1, std1))
-            print('[%s][%d]Accuracy-Flip: %1.5f+-%1.5f' % (ver_name_list[i], nbatch, acc2, std2))
+            logging.info('[%s][%d]XNorm: %f' % (ver_name_list[i], nbatch, xnorm))
+            # logging.info('[%s][%d]Accuracy: %1.5f+-%1.5f' % (ver_name_list[i], nbatch, acc1, std1))
+            logging.info('[%s][%d]Accuracy-Flip: %1.5f+-%1.5f' % (ver_name_list[i], nbatch, acc2, std2))
             results.append(acc2)
         return results
 
@@ -509,11 +517,11 @@ def train_net(args):
             lr_steps = [100000, 140000, 160000]
         p = 512.0 / args.batch_size
         for l in range(len(lr_steps)):
-            lr_steps[l] = int(lr_steps[l])
-            # lr_steps[l] = int(lr_steps[l] * p)
+            # lr_steps[l] = int(lr_steps[l])
+            lr_steps[l] = int(lr_steps[l] * p)
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
-    print('lr_steps', lr_steps)
+    logging.info('lr_steps %s', lr_steps)
 
     def _batch_callback(param):
         # global global_step
@@ -522,61 +530,50 @@ def train_net(args):
         for _lr in lr_steps:
             if mbatch == args.beta_freeze + _lr:
                 opt.lr *= 0.1
-                print('lr change to', opt.lr)
+                logging.info('lr change to %s', opt.lr)
                 break
 
         _cb(param)
+        acc = param.eval_metric.get()[1][0]
         if mbatch % 100 == 0:
-            print('lr-batch-epoch:', opt.lr, param.nbatch, param.epoch, global_step[0])
+            logging.info('lr-batch-epoch: lr %s, nbatch %s, epoch %s, step %s', opt.lr, param.nbatch, param.epoch, global_step[0])
 
-        if mbatch >= 0 and mbatch % args.verbose == 0:
-            acc_list = ver_test(mbatch)
-            save_step[0] += 1
-            msave = save_step[0]
-            do_save = False
-            is_highest = False
-            if len(acc_list) > 0:
-                # lfw_score = acc_list[0]
-                # if lfw_score>highest_acc[0]:
-                #  highest_acc[0] = lfw_score
-                #  if lfw_score>=0.998:
-                #    do_save = True
-                score = sum(acc_list)
-                if acc_list[-1] >= highest_acc[-1]:
-                    if acc_list[-1] > highest_acc[-1]:
-                        is_highest = True
-                    else:
-                        if score >= highest_acc[0]:
-                            is_highest = True
-                            highest_acc[0] = score
-                    highest_acc[-1] = acc_list[-1]
-                    # if lfw_score>=0.99:
-                    #  do_save = True
-            if is_highest:
-                do_save = True
-            if args.ckpt == 0:
-                do_save = False
-            elif args.ckpt == 2:
-                do_save = True
-            elif args.ckpt == 3:
-                msave = 1
+        sw.add_scalar(tag='lr', value=opt.lr, global_step=mbatch)
+        sw.add_scalar(tag='acc', value=acc, global_step=mbatch)
 
-            if do_save:
-                print('saving', msave)
-                arg, aux = model.get_params()
-                mx.model.save_checkpoint(prefix, msave, model.symbol, arg, aux)
-            print('[%d]Accuracy-Highest: %1.5f' % (mbatch, highest_acc[-1]))
         if mbatch <= args.beta_freeze:
             _beta = args.beta
         else:
             move = max(0, mbatch - args.beta_freeze)
             _beta = max(args.beta_min, args.beta * math.pow(1 + args.gamma * move, -1.0 * args.power))
-        # print('beta', _beta)
+        # logging.info('beta', _beta)
         os.environ['BETA'] = str(_beta)
         if args.max_steps > 0 and mbatch > args.max_steps:
             sys.exit(0)
 
-    epoch_cb = None
+    def epoch_cb(epoch, symbol, arg, aux):
+        acc_list = ver_test(epoch)
+        logging.info('[%d]Accuracy-Highest: %1.5f' % (epoch, acc_list))
+        sw.add_scalar(tag='acc', value=acc_list[0], global_step=global_step[0])
+        # if is_highest:
+        #     do_save = True
+        # if args.ckpt == 0:
+        #     do_save = False
+        # elif args.ckpt == 2:
+        #     do_save = True
+        # elif args.ckpt == 3:
+        #     msave = 1
+
+        logging.info('saving %s', epoch)
+        arg, aux = model.get_params()
+        new_arg = {}
+        for k in arg:
+            if k == "fc7_weight":
+                continue
+            new_arg[k] = arg[k]
+        new_arg = arg
+        mx.model.save_checkpoint(prefix + "/model", epoch, model.symbol[0].get_children(), new_arg, aux)
+
     train_dataiter = mx.io.PrefetchingIter(train_dataiter)
 
     model.fit(train_dataiter,

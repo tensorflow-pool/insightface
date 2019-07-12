@@ -117,6 +117,7 @@ src/eval/*.bin
 
 src/data/asia*
 src/data/pairs.txt
+src/train
 
 RetinaFace
 models

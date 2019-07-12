@@ -26,7 +26,7 @@ facescrub_out = '/home/lijc08/datasets/megaface_customer_features/FaceScrub_Feat
 
 
 def do_flip(data):
-    for idx in xrange(data.shape[0]):
+    for idx in range(data.shape[0]):
         data[idx, :, :] = np.fliplr(data[idx, :, :])
 
 
