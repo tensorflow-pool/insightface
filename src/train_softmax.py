@@ -559,7 +559,7 @@ def train_net(args):
         sw.add_scalar(tag='acc', value=acc, global_step=mbatch)
         sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
 
-        if mbatch % 10000:
+        if mbatch % 10000 == 0:
             acc_list = ver_test(mbatch)
             logging.info('[%d]Accuracy-Highest: %1.5f' % (mbatch, acc_list))
             sw.add_scalar(tag='acc', value=acc_list[0], global_step=global_step[0])
