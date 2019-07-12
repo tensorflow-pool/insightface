@@ -62,6 +62,21 @@ class AccMetric(mx.metric.EvalMetric):
         self.num_inst += len(pred_label.flat)
 
 
+class LossMetric(mx.metric.EvalMetric):
+    def __init__(self):
+        self.axis = 1
+        super(LossMetric, self).__init__('loss', axis=self.axis, output_names=None, label_names=None)
+        self.losses = []
+        self.count = 0
+
+    def update(self, labels, preds):
+        self.count += 1
+        loss = -mx.ndarray.broadcast_mul(mx.ndarray.one_hot(mx.ndarray.array(labels[0], ctx=mx.gpu()), depth=args.num_classes, on_value=1, off_value=0), preds[1].log()).sum(
+            axis=1).mean()
+        self.sum_metric += loss.asnumpy()
+        self.num_inst += 1
+
+
 class LossValueMetric(mx.metric.EvalMetric):
     def __init__(self):
         self.axis = 1
@@ -83,7 +98,7 @@ def parse_args():
     # general
     parser.add_argument('--data-dir', default='~/datasets/glintasia', help='training set directory')
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
-    parser.add_argument('--pretrained', default='../models/model-r100-ii/model,0', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
     parser.add_argument('--ckpt', type=int, default=2,
                         help='checkpoint saving option. 0: discard saving. 1: save when necessary. 2: always save')
     parser.add_argument('--loss-type', type=int, default=5, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b')
@@ -100,7 +115,7 @@ def parse_args():
     parser.add_argument('--version-multiplier', type=float, default=1.0, help='filters multiplier')
     parser.add_argument('--version-act', type=str, default='prelu', help='network activation config')
     parser.add_argument('--use-deformable', type=int, default=0, help='use deformable cnn in network')
-    parser.add_argument('--lr', type=float, default=0.1, help='start learning rate')
+    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
     parser.add_argument('--lr-steps', type=str, default='', help='steps of lr changing')
     parser.add_argument('--wd', type=float, default=0.0005, help='weight decay')
     parser.add_argument('--fc7-wd-mult', type=float, default=1.0, help='weight decay mult for fc7')
@@ -468,7 +483,8 @@ def train_net(args):
     )
 
     metric1 = AccMetric()
-    eval_metrics = [mx.metric.create(metric1)]
+    loss_metric1 = LossMetric()
+    eval_metrics = [mx.metric.create(metric1), mx.metric.create(loss_metric1)]
     if args.ce_loss:
         metric2 = LossValueMetric()
         eval_metrics.append(mx.metric.create(metric2))
@@ -534,12 +550,29 @@ def train_net(args):
                 break
 
         _cb(param)
-        acc = param.eval_metric.get()[1][0]
+        acc = param.eval_metric.get_name_value()[0][1]
+        loss = param.eval_metric.get_name_value()[1][1]
         if mbatch % 100 == 0:
-            logging.info('lr-batch-epoch: lr %s, nbatch %s, epoch %s, step %s', opt.lr, param.nbatch, param.epoch, global_step[0])
+            logging.info('lr-batch-epoch: lr %s, nbatch %s, epoch %s, step %s acc %s loss %s', opt.lr, param.nbatch, param.epoch, global_step[0], acc, loss)
 
         sw.add_scalar(tag='lr', value=opt.lr, global_step=mbatch)
         sw.add_scalar(tag='acc', value=acc, global_step=mbatch)
+        sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
+
+        if mbatch % 10000:
+            acc_list = ver_test(mbatch)
+            logging.info('[%d]Accuracy-Highest: %1.5f' % (mbatch, acc_list))
+            sw.add_scalar(tag='acc', value=acc_list[0], global_step=global_step[0])
+
+            logging.info('saving %s', mbatch)
+            arg, aux = model.get_params()
+            new_arg = {}
+            for k in arg:
+                if k == "fc7_weight":
+                    continue
+                new_arg[k] = arg[k]
+            new_arg = arg
+            mx.model.save_checkpoint(prefix + "/model", mbatch, model.symbol[0].get_children(), new_arg, aux)
 
         if mbatch <= args.beta_freeze:
             _beta = args.beta
@@ -552,27 +585,7 @@ def train_net(args):
             sys.exit(0)
 
     def epoch_cb(epoch, symbol, arg, aux):
-        acc_list = ver_test(epoch)
-        logging.info('[%d]Accuracy-Highest: %1.5f' % (epoch, acc_list))
-        sw.add_scalar(tag='acc', value=acc_list[0], global_step=global_step[0])
-        # if is_highest:
-        #     do_save = True
-        # if args.ckpt == 0:
-        #     do_save = False
-        # elif args.ckpt == 2:
-        #     do_save = True
-        # elif args.ckpt == 3:
-        #     msave = 1
-
-        logging.info('saving %s', epoch)
-        arg, aux = model.get_params()
-        new_arg = {}
-        for k in arg:
-            if k == "fc7_weight":
-                continue
-            new_arg[k] = arg[k]
-        new_arg = arg
-        mx.model.save_checkpoint(prefix + "/model", epoch, model.symbol[0].get_children(), new_arg, aux)
+        pass
 
     train_dataiter = mx.io.PrefetchingIter(train_dataiter)
 
