@@ -38,18 +38,20 @@ args = None
 
 
 class AccMetric(mx.metric.EvalMetric):
-    def __init__(self):
+    def __init__(self, real=False):
+        self.real = real
         self.axis = 1
-        super(AccMetric, self).__init__(
-            'acc', axis=self.axis,
-            output_names=None, label_names=None)
+        super(AccMetric, self).__init__('real_acc' if real else 'acc', axis=self.axis, output_names=None, label_names=None)
         self.losses = []
         self.count = 0
 
     def update(self, labels, preds):
         self.count += 1
         label = labels[0]
-        pred_label = preds[1]
+        if self.real:
+            pred_label = mx.nd.softmax(preds[2])
+        else:
+            pred_label = preds[1]
         if pred_label.shape != label.shape:
             pred_label = mx.ndarray.argmax(pred_label, axis=self.axis)
         pred_label = pred_label.asnumpy().astype('int32').flatten()
@@ -63,15 +65,20 @@ class AccMetric(mx.metric.EvalMetric):
 
 
 class LossMetric(mx.metric.EvalMetric):
-    def __init__(self):
+    def __init__(self, real=False):
+        self.real = real
         self.axis = 1
-        super(LossMetric, self).__init__('loss', axis=self.axis, output_names=None, label_names=None)
+        super(LossMetric, self).__init__('real_loss' if real else 'loss', axis=self.axis, output_names=None, label_names=None)
         self.losses = []
         self.count = 0
 
     def update(self, labels, preds):
         self.count += 1
-        loss = -mx.ndarray.broadcast_mul(mx.ndarray.one_hot(mx.ndarray.array(labels[0], ctx=mx.gpu()), depth=args.num_classes, on_value=1, off_value=0), preds[1].log()).sum(
+        if self.real:
+            softmax_val = mx.nd.softmax(preds[2])
+        else:
+            softmax_val = preds[1]
+        loss = -mx.ndarray.broadcast_mul(mx.ndarray.one_hot(mx.ndarray.array(labels[0], ctx=mx.gpu()), depth=args.num_classes, on_value=1, off_value=0), softmax_val.log()).sum(
             axis=1).mean()
         self.sum_metric += loss.asnumpy()
         self.num_inst += 1
@@ -116,7 +123,7 @@ def parse_args():
     parser.add_argument('--version-multiplier', type=float, default=1.0, help='filters multiplier')
     parser.add_argument('--version-act', type=str, default='prelu', help='network activation config')
     parser.add_argument('--use-deformable', type=int, default=0, help='use deformable cnn in network')
-    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
+    parser.add_argument('--lr', type=float, default=0.02, help='start learning rate')
     parser.add_argument('--lr-steps', type=str, default='', help='steps of lr changing')
     parser.add_argument('--wd', type=float, default=0.0005, help='weight decay')
     parser.add_argument('--fc7-wd-mult', type=float, default=1.0, help='weight decay mult for fc7')
@@ -125,7 +132,7 @@ def parse_args():
     parser.add_argument('--bn-mom', type=float, default=0.9, help='bn mom')
     parser.add_argument('--mom', type=float, default=0.9, help='momentum')
     parser.add_argument('--emb-size', type=int, default=512, help='embedding length')
-    parser.add_argument('--per-batch-size', type=int, default=64, help='batch size in each context')
+    parser.add_argument('--per-batch-size', type=int, default=16, help='batch size in each context')
     parser.add_argument('--margin-m', type=float, default=0.3, help='margin for loss')
     parser.add_argument('--margin-s', type=float, default=64.0, help='scale for feature')
     parser.add_argument('--margin-a', type=float, default=1.0, help='')
@@ -274,6 +281,7 @@ def get_symbol(args, arg_params, aux_params):
         nembedding = mx.symbol.L2Normalization(embedding, mode='instance', name='fc1n') * s
         fc7 = mx.sym.FullyConnected(data=nembedding, weight=_weight, no_bias=True, num_hidden=args.num_classes,
                                     name='fc7')
+        origin_fc7 = fc7
         if args.margin_a != 1.0 or args.margin_m != 0.0 or args.margin_b != 0.0:
             if args.margin_a == 1.0 and args.margin_m == 0.0:
                 s_m = s * args.margin_b
@@ -368,6 +376,7 @@ def get_symbol(args, arg_params, aux_params):
     out_list = [mx.symbol.BlockGrad(embedding)]
     softmax = mx.symbol.SoftmaxOutput(data=fc7, label=gt_label, name='softmax', normalization='valid')
     out_list.append(softmax)
+    out_list.append(mx.symbol.BlockGrad(origin_fc7))
     if args.loss_type == 6:
         out_list.append(intra_loss)
     if args.loss_type == 7:
@@ -483,9 +492,7 @@ def train_net(args):
         images_filter=args.images_filter,
     )
 
-    metric1 = AccMetric()
-    loss_metric1 = LossMetric()
-    eval_metrics = [mx.metric.create(metric1), mx.metric.create(loss_metric1)]
+    eval_metrics = [mx.metric.create([AccMetric(), LossMetric(), AccMetric(True), LossMetric(True)])]
     if args.ce_loss:
         metric2 = LossValueMetric()
         eval_metrics.append(mx.metric.create(metric2))
@@ -552,12 +559,16 @@ def train_net(args):
         _cb(param)
         acc = param.eval_metric.get_name_value()[0][1]
         loss = param.eval_metric.get_name_value()[1][1]
+        real_acc = param.eval_metric.get_name_value()[2][1]
+        real_loss = param.eval_metric.get_name_value()[3][1]
         if mbatch % 100 == 0:
-            logging.info('lr-batch-epoch: lr %s, nbatch %s, epoch %s, step %s acc %s loss %s', opt.lr, param.nbatch, param.epoch, global_step[0], acc, loss)
+            logging.info('lr-batch-epoch: lr %s, nbatch %s, epoch %s, step %s', opt.lr, param.nbatch, param.epoch, global_step[0])
 
         sw.add_scalar(tag='lr', value=opt.lr, global_step=mbatch)
         sw.add_scalar(tag='acc', value=acc, global_step=mbatch)
         sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
+        sw.add_scalar(tag='real_acc', value=real_acc, global_step=mbatch)
+        sw.add_scalar(tag='real_loss', value=real_loss, global_step=mbatch)
 
         if mbatch % args.check_save == 0:
             if len(ver_list) > 0:
