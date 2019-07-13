@@ -561,9 +561,10 @@ def train_net(args):
         sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
 
         if mbatch % args.check_save == 0:
-            acc_list = ver_test(mbatch)
-            logging.info('[%d]Accuracy-Highest: %s' % (mbatch, acc_list))
-            sw.add_scalar(tag='val', value=acc_list[0], global_step=global_step[0])
+            if len(ver_list) > 0:
+                acc_list = ver_test(mbatch)
+                logging.info('[%d]Accuracy-Highest: %s' % (mbatch, acc_list))
+                sw.add_scalar(tag='val', value=acc_list[0], global_step=global_step[0])
 
             logging.info('saving %s', mbatch)
             arg, aux = model.get_params()
