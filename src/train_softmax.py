@@ -98,7 +98,7 @@ def parse_args():
     # general
     parser.add_argument('--data-dir', default='~/datasets/glintasia', help='training set directory')
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
-    parser.add_argument('--pretrained', default='../models/model-r34-7-19/model,100000', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='../models/model-r34-7-19/model,172000', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models/model-r34-amf/model,0', help='pretrained model to load')
     parser.add_argument('--ckpt', type=int, default=2,
                         help='checkpoint saving option. 0: discard saving. 1: save when necessary. 2: always save')
@@ -526,8 +526,7 @@ def train_net(args):
     highest_acc = [0.0, 0.0]  # lfw and target
     # for i in range(len(ver_list)):
     #  highest_acc.append(0.0)
-    global_step = [0]
-    save_step = [0]
+    global_step = [500000]
     if len(args.lr_steps) == 0:
         lr_steps = [40000, 60000, 80000]
         if args.loss_type >= 1 and args.loss_type <= 7:
