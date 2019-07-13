@@ -49,7 +49,7 @@ class AccMetric(mx.metric.EvalMetric):
         self.count += 1
         label = labels[0]
         if self.real:
-            pred_label = mx.nd.softmax(preds[2])
+            pred_label = preds[2]
         else:
             pred_label = preds[1]
         if pred_label.shape != label.shape:
@@ -75,7 +75,7 @@ class LossMetric(mx.metric.EvalMetric):
     def update(self, labels, preds):
         self.count += 1
         if self.real:
-            softmax_val = mx.nd.softmax(preds[2])
+            softmax_val = preds[2]
         else:
             softmax_val = preds[1]
         loss = -mx.ndarray.broadcast_mul(mx.ndarray.one_hot(mx.ndarray.array(labels[0], ctx=mx.gpu()), depth=args.num_classes, on_value=1, off_value=0), softmax_val.log()).sum(
@@ -376,7 +376,7 @@ def get_symbol(args, arg_params, aux_params):
     out_list = [mx.symbol.BlockGrad(embedding)]
     softmax = mx.symbol.SoftmaxOutput(data=fc7, label=gt_label, name='softmax', normalization='valid')
     out_list.append(softmax)
-    out_list.append(mx.symbol.BlockGrad(origin_fc7))
+    out_list.append(mx.symbol.BlockGrad(mx.symbol.softmax(origin_fc7)))
     if args.loss_type == 6:
         out_list.append(intra_loss)
     if args.loss_type == 7:
