@@ -4,10 +4,10 @@ import mxnet as mx
 from PIL import Image
 from mxnet import recordio
 
-path_imgidx = "/home/lijc08/datasets/glintasia/faces_glintasia/train.idx"
-path_imgrec = "/home/lijc08/datasets/glintasia/faces_glintasia/train.rec"
-# path_imgidx = "/home/lijc08/datasets/glint/faces_glint/train.idx"
-# path_imgrec = "/home/lijc08/datasets/glint/faces_glint/train.rec"
+# path_imgidx = "/home/lijc08/datasets/glintasia/train.idx"
+# path_imgrec = "/home/lijc08/datasets/glintasia/train.rec"
+path_imgidx = "/home/lijc08/datasets/glint/train.idx"
+path_imgrec = "/home/lijc08/datasets/glint/train.rec"
 imgrec = recordio.MXIndexedRecordIO(path_imgidx, path_imgrec, 'r')  # pylint: disable=redefined-variable-type
 s = imgrec.read_idx(0)
 header, _ = recordio.unpack(s)
@@ -34,13 +34,13 @@ if header.flag > 0:
         s = imgrec.read_idx(idx)
         header, img = recordio.unpack(s)
         decodeImg = mx.image.imdecode(img)
-        print "header", header
+        print("header", header)
         label = header.label
         if not isinstance(label, numbers.Number):
             label = int(label[0])
 
         img = Image.fromarray(decodeImg.asnumpy(), 'RGB')
-        img.save("glintasia/" + str(idx) + "_" + str(label) + ".jpeg", format='JPEG')
+        img.save("glint/" + str(idx) + "_" + str(label) + ".jpeg", format='JPEG')
 
 
     # for idx in range(1, 2800000, 10000):
