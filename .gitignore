@@ -110,6 +110,7 @@ exam/lfw*
 exam/face*
 exam/glint*
 exam/images*
+exam/ms1m*
 
 src/eval/badcases*
 src/eval/*.bin
