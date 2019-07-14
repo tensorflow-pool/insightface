@@ -124,11 +124,11 @@ def parse_args():
     parser.add_argument('--version-multiplier', type=float, default=1.0, help='filters multiplier')
     parser.add_argument('--version-act', type=str, default='prelu', help='network activation config')
     parser.add_argument('--use-deformable', type=int, default=0, help='use deformable cnn in network')
-    parser.add_argument('--lr', type=float, default=0.0, help='start learning rate')
+    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
     parser.add_argument('--lr-steps', type=str, default='', help='steps of lr changing')
     parser.add_argument('--wd', type=float, default=0.0005, help='weight decay')
     parser.add_argument('--fc7-wd-mult', type=float, default=1.0, help='weight decay mult for fc7')
-    parser.add_argument('--fc7-lr-mult', type=float, default=1.0, help='lr mult for fc7')
+    parser.add_argument('--fc7-lr-mult', type=float, default=2.0, help='lr mult for fc7')
     parser.add_argument("--fc7-no-bias", default=False, action="store_true", help="fc7 no bias flag")
     parser.add_argument('--bn-mom', type=float, default=0.9, help='bn mom')
     parser.add_argument('--mom', type=float, default=0.9, help='momentum')
@@ -244,6 +244,7 @@ def get_symbol(args, arg_params, aux_params):
         nembedding = mx.symbol.L2Normalization(embedding, mode='instance', name='fc1n') * s
         fc7 = mx.sym.FullyConnected(data=nembedding, weight=_weight, no_bias=True, num_hidden=args.num_classes,
                                     name='fc7')
+        origin_fc7 = fc7
         zy = mx.sym.pick(fc7, gt_label, axis=1)
         cos_t = zy / s
         cos_m = math.cos(m)
