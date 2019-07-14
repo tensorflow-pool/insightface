@@ -142,7 +142,7 @@ def parse_args():
     parser.add_argument('--lr-steps', type=str, default='', help='steps of lr changing')
     parser.add_argument('--wd', type=float, default=0.0005, help='weight decay')
     parser.add_argument('--fc7-wd-mult', type=float, default=1.0, help='weight decay mult for fc7')
-    parser.add_argument('--fc7-lr-mult', type=float, default=2.0, help='lr mult for fc7')
+    parser.add_argument('--fc7-lr-mult', type=float, default=1.0, help='lr mult for fc7')
     parser.add_argument("--fc7-no-bias", default=False, action="store_true", help="fc7 no bias flag")
     parser.add_argument('--bn-mom', type=float, default=0.9, help='bn mom')
     parser.add_argument('--mom', type=float, default=0.9, help='momentum')
