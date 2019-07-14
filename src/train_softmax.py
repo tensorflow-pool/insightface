@@ -563,6 +563,7 @@ def train_net(args):
         for l in range(len(lr_steps)):
             # lr_steps[l] = int(lr_steps[l])
             lr_steps[l] = int(lr_steps[l] * p)
+        args.max_steps = 2 * lr_steps[-1] - lr_steps[-2]
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
     logging.info('lr_steps %s', lr_steps)
