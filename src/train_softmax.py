@@ -84,6 +84,18 @@ class LossMetric(mx.metric.EvalMetric):
         self.num_inst += 1
 
 
+class ThetaMetric(mx.metric.EvalMetric):
+    def __init__(self):
+        self.axis = 1
+        super(ThetaMetric, self).__init__('theta', axis=self.axis, output_names=None, label_names=None)
+        self.losses = []
+
+    def update(self, labels, preds):
+        theta = preds[3].asnumpy()
+        self.sum_metric += theta.mean()
+        self.num_inst += 1.0
+
+
 class LossValueMetric(mx.metric.EvalMetric):
     def __init__(self):
         self.axis = 1
@@ -103,11 +115,13 @@ class LossValueMetric(mx.metric.EvalMetric):
 def parse_args():
     parser = argparse.ArgumentParser(description='Train face network')
     # general
-    parser.add_argument('--data-dir', default='~/datasets/ms1m-v1/faces_ms1m_112x112', help='training set directory')
+    parser.add_argument('--data-dir', default='~/datasets/face_umd/faces_umd', help='training set directory')
+    # parser.add_argument('--data-dir', default='~/datasets/ms1m-v1/faces_ms1m_112x112', help='training set directory')
+    # parser.add_argument('--data-dir', default='~/datasets/glintasia', help='training set directory')
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
-    # parser.add_argument('--pretrained', default='../models/model-r34-7-19/model,172000', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
     parser.add_argument('--pretrained', default='../models/model-r34-amf/model,0', help='pretrained model to load')
+    # parser.add_argument('--pretrained', default='../models/model-r34-7-19/model,172000', help='pretrained model to load')
     parser.add_argument('--ckpt', type=int, default=2,
                         help='checkpoint saving option. 0: discard saving. 1: save when necessary. 2: always save')
     parser.add_argument('--loss-type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
@@ -247,6 +261,8 @@ def get_symbol(args, arg_params, aux_params):
         origin_fc7 = fc7
         zy = mx.sym.pick(fc7, gt_label, axis=1)
         cos_t = zy / s
+        t = mx.sym.degrees(mx.sym.arccos(cos_t))
+        origin_t = t
         cos_m = math.cos(m)
         sin_m = math.sin(m)
         mm = math.sin(math.pi - m) * m
@@ -292,7 +308,8 @@ def get_symbol(args, arg_params, aux_params):
             else:
                 zy = mx.sym.pick(fc7, gt_label, axis=1)
                 cos_t = zy / s
-                t = mx.sym.arccos(cos_t)
+                t = mx.sym.degrees(mx.sym.arccos(cos_t))
+                origin_t = t
                 if args.margin_a != 1.0:
                     t = t * args.margin_a
                 if args.margin_m > 0.0:
@@ -379,6 +396,7 @@ def get_symbol(args, arg_params, aux_params):
     softmax = mx.symbol.SoftmaxOutput(data=fc7, label=gt_label, name='softmax', normalization='valid')
     out_list.append(softmax)
     out_list.append(mx.symbol.BlockGrad(mx.symbol.softmax(origin_fc7)))
+    out_list.append(mx.symbol.BlockGrad(origin_t))
     if args.loss_type == 6:
         out_list.append(intra_loss)
     if args.loss_type == 7:
@@ -494,7 +512,7 @@ def train_net(args):
         images_filter=args.images_filter,
     )
 
-    eval_metrics = [mx.metric.create([AccMetric(), LossMetric(), AccMetric(True), LossMetric(True)])]
+    eval_metrics = [mx.metric.create([AccMetric(), LossMetric(), AccMetric(True), LossMetric(True), ThetaMetric()])]
     if args.ce_loss:
         metric2 = LossValueMetric()
         eval_metrics.append(mx.metric.create(metric2))
@@ -538,8 +556,8 @@ def train_net(args):
     global_step = [0]
     if len(args.lr_steps) == 0:
         lr_steps = [40000, 60000, 80000]
-        if args.loss_type >= 1 and args.loss_type <= 7:
-            lr_steps = [100000, 140000, 160000]
+        # if args.loss_type >= 1 and args.loss_type <= 7:
+        #     lr_steps = [100000, 140000, 160000]
         p = 512.0 / args.batch_size
         p = 1
         for l in range(len(lr_steps)):
@@ -572,6 +590,8 @@ def train_net(args):
         sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
         sw.add_scalar(tag='real_acc', value=real_acc, global_step=mbatch)
         sw.add_scalar(tag='real_loss', value=real_loss, global_step=mbatch)
+        theta = model.get_outputs()[-1].asnumpy()
+        sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
 
         if mbatch % args.check_save == 0:
             if len(ver_list) > 0:
