@@ -534,12 +534,13 @@ def train_net(args):
     highest_acc = [0.0, 0.0]  # lfw and target
     # for i in range(len(ver_list)):
     #  highest_acc.append(0.0)
-    global_step = [500000]
+    global_step = [0]
     if len(args.lr_steps) == 0:
         lr_steps = [40000, 60000, 80000]
         if args.loss_type >= 1 and args.loss_type <= 7:
             lr_steps = [100000, 140000, 160000]
         p = 512.0 / args.batch_size
+        p = 1
         for l in range(len(lr_steps)):
             # lr_steps[l] = int(lr_steps[l])
             lr_steps[l] = int(lr_steps[l] * p)
