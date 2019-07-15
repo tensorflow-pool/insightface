@@ -20,9 +20,12 @@ from mxnet import recordio
 # path_imgidx = "/home/lijc08/datasets/face_umd/faces_umd/train.idx"
 # path_imgrec = "/home/lijc08/datasets/face_umd/faces_umd/train.rec"
 # output = "face_umd"
-path_imgidx = "/home/lijc08/datasets/face_casia/faces_webface_112x112/train.idx"
-path_imgrec = "/home/lijc08/datasets/face_casia/faces_webface_112x112/train.rec"
-output = "face_casia"
+# path_imgidx = "/home/lijc08/datasets/face_casia/faces_webface_112x112/train.idx"
+# path_imgrec = "/home/lijc08/datasets/face_casia/faces_webface_112x112/train.rec"
+# output = "face_casia"
+path_imgidx = "/home/lijc08/datasets/face_vgg2/faces_vgg_112x112/train.idx"
+path_imgrec = "/home/lijc08/datasets/face_vgg2/faces_vgg_112x112/train.rec"
+output = "face_vgg2"
 
 if not os.path.exists(output):
     os.mkdir(output)
