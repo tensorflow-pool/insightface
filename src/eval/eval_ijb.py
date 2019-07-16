@@ -6,6 +6,8 @@ import warnings
 from pathlib import Path
 
 import cv2
+import datetime
+import os
 import matplotlib.pyplot as plt
 import mxnet as mx
 import numpy as np
@@ -38,7 +40,7 @@ class Embedding2:
     def get(self, data):
         db = mx.io.DataBatch(data=(data,))
         self.model.forward(db, is_train=False)
-        feat = self.model.get_outputs()[0].asnumpy()
+        feat = self.model.get_outputs()[0]
         return feat
 
 
@@ -84,7 +86,8 @@ def batchify_fn(data):
         img = np.transpose(img, (2, 0, 1))  # 3*112*112, RGB
         input_blob.append(img)
         scores.append(item[2])
-    return mx.nd.array(input_blob, ctx=mx.context.Context('cpu_shared', 0)), mx.nd.array(scores, mx.context.Context('cpu_shared', 0)).astype(np.float32)
+    return mx.nd.array(input_blob, ctx=mx.gpu()), mx.nd.array(scores, mx.gpu()).astype(np.float32)
+    #return mx.nd.array(input_blob, ctx=mx.context.Context('cpu_shared', 0)), mx.nd.array(scores, mx.context.Context('cpu_shared', 0)).astype(np.float32)
 
 
 def get_image_feature_gluon(img_path, img_list_path, model_path, batch=32):
@@ -113,14 +116,19 @@ def get_image_feature_gluon(img_path, img_list_path, model_path, batch=32):
     dataset = ImageDataset(img_path, img_list_path)
     print("dataset len ", len(dataset))
     # dataloader = mx.gluon.data.DataLoader(dataset, batch_size=batch, num_workers=2, thread_pool=True, batchify_fn=batchify_fn)
-    dataloader = mx.gluon.data.DataLoader(dataset, batch_size=batch, num_workers=4, thread_pool=False, batchify_fn=batchify_fn)
+    dataloader = mx.gluon.data.DataLoader(dataset, batch_size=batch, num_workers=4, thread_pool=True, batchify_fn=batchify_fn)
 
     features = []
     faceness_scores = []
     for batch in print_progress(dataloader):
-        features.append(embedding.get(batch[0]))
-        faceness_scores.append(batch[1])
-    return np.concatenate(features), np.concatenate(faceness_scores)
+        features.append(embedding.get(batch[0]).asnumpy())
+        faceness_scores.append(batch[1].asnumpy())
+    print("1", datetime.datetime.now())
+    ret_features = np.concatenate(features)
+    print("2", datetime.datetime.now())
+    ret_scores = np.concatenate(faceness_scores)
+    print("3", datetime.datetime.now())
+    return ret_features, ret_scores
 
 
 def image2template_feature(img_feats=None, templates=None, medias=None):
@@ -197,8 +205,7 @@ def load_pair():
     return p1, p2, label
 
 
-def main1(model_path=os.path.join(BaseDir, 'pretrained_models/model-r34-amf/model, 0'),
-          score_save_name=os.path.join(BaseDir, 'IJBB/result3/asia-ResNet34-ArcFace-TestMode(N0D0F0).npy')):
+def main1(model_path,score_save_name):
     start = timeit.default_timer()
     # img_feats = read_image_feature('./MS1MV2/IJBB_MS1MV2_r100_arcface.pkl')
     img_path = os.path.join(BaseDir, 'IJBB/loose_crop')
@@ -207,8 +214,10 @@ def main1(model_path=os.path.join(BaseDir, 'pretrained_models/model-r34-amf/mode
     stop = timeit.default_timer()
     print('feature Time: %.2f s. ' % (stop - start))
     print('Feature Shape: ({} , {}) .'.format(img_feats.shape[0], img_feats.shape[1]))
-    np.save("ijb/features.npy", img_feats)
-    np.save("ijb/scores.npy", faceness_scores)
+#     if not os.path.exists("ijb"):
+#         os.mkdir("ijb")
+#     np.save("ijb/features.npy", img_feats)
+#     np.save("ijb/scores.npy", faceness_scores)
 
     # =============================================================
     # load image and template relationships for template feature embedding
@@ -309,10 +318,12 @@ def display(label, score_save_path=os.path.join(BaseDir, './IJBB/result3')):
     plt.title('ROC on IJB-B')
     plt.legend(loc="lower right")
     print(tpr_fpr_table)
-    plt.show()
+    #plt.show()
+    fig.savefig(os.path.join(score_save_path, "plt.png"))
 
-
-main1(model_path=os.path.join("../..", 'models/model-r34-7-19/model, 804000'))
+#os.path.join(BaseDir, 'pretrained_models/model-r100-ii-1-16/model, 29')
+main1(model_path=os.path.join("../..", 'models/y2-iccv/model, 1'),
+          score_save_name=os.path.join(BaseDir, 'IJBB/result3/ms1m_y2(N0D0F0).npy'))
 
 # p1, p2, label = load_pair()
 # display(label)
