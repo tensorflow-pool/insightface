@@ -1,25 +1,45 @@
 import _pickle as cPickle
 import glob
 import os
-import sys
 import timeit
+import warnings
+from pathlib import Path
 
 import cv2
 import matplotlib.pyplot as plt
+import mxnet as mx
 import numpy as np
-from sklearn.metrics import roc_curve, auc
-
-sys.path.append('./recognition')
-from embedding import Embedding2
 from menpo.visualize import print_progress
 from menpo.visualize.viewmatplotlib import sample_colours_from_colourmap
 from prettytable import PrettyTable
-from pathlib import Path
-import warnings
+from skimage import transform as trans
+from sklearn.metrics import roc_curve, auc
 
 warnings.filterwarnings("ignore")
 
 BaseDir = os.path.expanduser("~/datasets/ijb/IJB_release")
+
+
+class Embedding2:
+    def __init__(self, prefix, batch_size=64):
+        print('loading', prefix)
+        prefix, epoch = prefix.split(",")
+        ctx = mx.gpu()
+        sym, arg_params, aux_params = mx.model.load_checkpoint(prefix, int(epoch))
+        all_layers = sym.get_internals()
+        sym = all_layers['fc1_output']
+        image_size = (112, 112)
+        self.image_size = image_size
+        model = mx.mod.Module(symbol=sym, context=ctx, label_names=None)
+        model.bind(for_training=False, data_shapes=[('data', (batch_size, 3, image_size[0], image_size[1]))])
+        model.set_params(arg_params, aux_params)
+        self.model = model
+
+    def get(self, data):
+        db = mx.io.DataBatch(data=(data,))
+        self.model.forward(db, is_train=False)
+        feat = self.model.get_outputs()[0].asnumpy()
+        return feat
 
 
 def read_template_media_list(path):
@@ -43,33 +63,64 @@ def read_image_feature(path):
     return img_feats
 
 
-def get_image_feature(img_path, img_list_path, model_path, gpu_id):
-    img_list = open(img_list_path)
-    batch = 64
-    embedding = Embedding2(model_path, 0, gpu_id, batch)
-    files = img_list.readlines()[:10]
-    img_feats = []
+def batchify_fn(data):
+    src = np.array([
+        [30.2946, 51.6963],
+        [65.5318, 51.5014],
+        [48.0252, 71.7366],
+        [33.5493, 92.3655],
+        [62.7299, 92.2041]], dtype=np.float32)
+    src[:, 0] += 8.0
+    input_blob = []
+    scores = []
+    for item in data:
+        rimg = item[0]
+        landmark5 = item[1]
+        tform = trans.SimilarityTransform()
+        tform.estimate(landmark5, src)
+        M = tform.params[0:2, :]
+        img = cv2.warpAffine(rimg, M, (112, 112), borderValue=0.0)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = np.transpose(img, (2, 0, 1))  # 3*112*112, RGB
+        input_blob.append(img)
+        scores.append(item[2])
+    return mx.nd.array(input_blob, ctx=mx.context.Context('cpu_shared', 0)), mx.nd.array(scores, mx.context.Context('cpu_shared', 0)).astype(np.float32)
+
+
+def get_image_feature_gluon(img_path, img_list_path, model_path, batch=32):
+    embedding = Embedding2(model_path, batch)
+
+    class ImageDataset(mx.gluon.data.Dataset):
+        def __init__(self, img_path, img_list_path):
+            super(ImageDataset, self).__init__()
+            self.img_path = img_path
+            self.img_list_path = img_list_path
+            with open(img_list_path) as file:
+                self.files = file.readlines()
+
+        def __len__(self):
+            return len(self.files)
+
+        def __getitem__(self, idx):
+            each_line = self.files[idx]
+            name_lmk_score = each_line.strip().split(' ')
+            img_name = os.path.join(self.img_path, name_lmk_score[0])
+            img = cv2.imread(img_name)
+            lmk = np.array([float(x) for x in name_lmk_score[1:-1]], dtype=np.float32)
+            lmk = lmk.reshape((5, 2))
+            return img, lmk, name_lmk_score[-1]
+
+    dataset = ImageDataset(img_path, img_list_path)
+    print("dataset len ", len(dataset))
+    # dataloader = mx.gluon.data.DataLoader(dataset, batch_size=batch, num_workers=2, thread_pool=True, batchify_fn=batchify_fn)
+    dataloader = mx.gluon.data.DataLoader(dataset, batch_size=batch, num_workers=4, thread_pool=False, batchify_fn=batchify_fn)
+
+    features = []
     faceness_scores = []
-
-    count = 0
-    batchs = []
-    for img_index, each_line in enumerate(print_progress(files)):
-        name_lmk_score = each_line.strip().split(' ')
-        img_name = os.path.join(img_path, name_lmk_score[0])
-        img = cv2.imread(img_name)
-        lmk = np.array([float(x) for x in name_lmk_score[1:-1]], dtype=np.float32)
-        lmk = lmk.reshape((5, 2))
-
-        batchs.append((img, lmk))
-        faceness_scores.append(name_lmk_score[-1])
-        if len(batchs) == batch:
-            imgs = [k[0] for k in batchs]
-            lmks = [k[1] for k in batchs]
-            batchs = []
-            img_feats.append(embedding.get(np.array(imgs), np.array(lmks)))
-    img_feats = np.array(img_feats).astype(np.float32)
-    faceness_scores = np.array(faceness_scores).astype(np.float32)
-    return img_feats, faceness_scores
+    for batch in print_progress(dataloader):
+        features.append(embedding.get(batch[0]))
+        faceness_scores.append(batch[1])
+    return np.concatenate(features), np.concatenate(faceness_scores)
 
 
 def image2template_feature(img_feats=None, templates=None, medias=None):
@@ -80,7 +131,6 @@ def image2template_feature(img_feats=None, templates=None, medias=None):
     # ==========================================================
     unique_templates = np.unique(templates)
     template_feats = np.zeros((len(unique_templates), img_feats.shape[1]))
-
     for count_template, uqt in enumerate(unique_templates):
         (ind_t,) = np.where(templates == uqt)
         face_norm_feats = img_feats[ind_t]
@@ -133,18 +183,7 @@ def read_score(path):
     return img_feats
 
 
-def main1():
-    # =============================================================
-    # load image and template relationships for template feature embedding
-    # tid --> template id,  mid --> media id
-    # format:
-    #           image_name tid mid
-    # =============================================================
-    start = timeit.default_timer()
-    templates, medias = read_template_media_list(os.path.join('IJBB/meta', 'ijbb_face_tid_mid.txt'))
-    stop = timeit.default_timer()
-    print('Time: %.2f s. ' % (stop - start))
-
+def load_pair():
     # =============================================================
     # load template pairs for template-to-template verification
     # tid : template id,  label : 1/0
@@ -152,21 +191,37 @@ def main1():
     #           tid_1 tid_2 label
     # =============================================================
     start = timeit.default_timer()
-    p1, p2, label = read_template_pair_list(os.path.join('IJBB/meta', 'ijbb_template_pair_label.txt'))
+    p1, p2, label = read_template_pair_list(os.path.join(BaseDir, 'IJBB/meta', 'ijbb_template_pair_label.txt'))
     stop = timeit.default_timer()
-    print('Time: %.2f s. ' % (stop - start))
+    print('ijbb_template_pair_label Time: %.2f s. ' % (stop - start))
+    return p1, p2, label
 
+
+def main1(model_path=os.path.join(BaseDir, 'pretrained_models/model-r34-amf/model, 0'),
+          score_save_name=os.path.join(BaseDir, 'IJBB/result3/asia-ResNet34-ArcFace-TestMode(N0D0F0).npy')):
     start = timeit.default_timer()
     # img_feats = read_image_feature('./MS1MV2/IJBB_MS1MV2_r100_arcface.pkl')
-    img_path = './IJBB/loose_crop'
-    img_list_path = './IJBB/meta/ijbb_name_5pts_score.txt'
-    model_path = './pretrained_models/model-r34-amf/model'
-    gpu_id = 0
-    img_feats, faceness_scores = get_image_feature(img_path, img_list_path, model_path, gpu_id)
+    img_path = os.path.join(BaseDir, 'IJBB/loose_crop')
+    img_list_path = os.path.join(BaseDir, 'IJBB/meta/ijbb_name_5pts_score.txt')
+    img_feats, faceness_scores = get_image_feature_gluon(img_path, img_list_path, model_path)
     stop = timeit.default_timer()
-    print('Time: %.2f s. ' % (stop - start))
+    print('feature Time: %.2f s. ' % (stop - start))
     print('Feature Shape: ({} , {}) .'.format(img_feats.shape[0], img_feats.shape[1]))
+    np.save("ijb/features.npy", img_feats)
+    np.save("ijb/scores.npy", faceness_scores)
 
+    # =============================================================
+    # load image and template relationships for template feature embedding
+    # tid --> template id,  mid --> media id
+    # format:
+    #           image_name tid mid
+    # =============================================================
+    start = timeit.default_timer()
+    templates, medias = read_template_media_list(os.path.join(BaseDir, 'IJBB/meta', 'ijbb_face_tid_mid.txt'))
+    stop = timeit.default_timer()
+    print('ijbb_face_tid_mid Time: %.2f s. ' % (stop - start))
+
+    p1, p2, label = load_pair()
     # =============================================================
     # compute template features from image features.
     # =============================================================
@@ -211,11 +266,13 @@ def main1():
     stop = timeit.default_timer()
     print('Time: %.2f s. ' % (stop - start))
 
-    score_save_name = './IJBB/result2/MS1MV2-ResNet34-ArcFace-TestMode(N0D0F0).npy'
     np.save(score_save_name, score)
 
-    score_save_path = './IJBB/result2'
-    files = glob.glob(score_save_path + '/MS1MV2*.npy')
+    display(label, os.path.dirname(score_save_name))
+
+
+def display(label, score_save_path=os.path.join(BaseDir, './IJBB/result3')):
+    files = glob.glob(score_save_path + '/*.npy')
     methods = []
     scores = []
     for file in files:
@@ -251,20 +308,11 @@ def main1():
     plt.ylabel('True Positive Rate')
     plt.title('ROC on IJB-B')
     plt.legend(loc="lower right")
+    print(tpr_fpr_table)
     plt.show()
 
 
-def main2():
-    start = timeit.default_timer()
-    # img_feats = read_image_feature('./MS1MV2/IJBB_MS1MV2_r100_arcface.pkl')
-    img_path = os.path.join(BaseDir, 'IJBB/loose_crop')
-    img_list_path = os.path.join(BaseDir, 'IJBB/meta/ijbb_name_5pts_score.txt')
-    model_path = os.path.join(BaseDir, 'pretrained_models/model-r34-amf/model')
-    gpu_id = 0
-    img_feats, faceness_scores = get_image_feature(img_path, img_list_path, model_path, gpu_id)
-    stop = timeit.default_timer()
-    print('Time: %.2f s. ' % (stop - start))
-    print('Feature Shape: ({} , {}) .'.format(img_feats.shape[0], img_feats.shape[1]))
+main1(model_path=os.path.join("../..", 'models/model-r34-7-19/model, 804000'))
 
-
-main2()
+# p1, p2, label = load_pair()
+# display(label)
