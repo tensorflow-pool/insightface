@@ -50,12 +50,19 @@ class FaceImageIter(io.DataIter):
                 for identity in self.seq_identity:
                     s = self.imgrec.read_idx(identity)
                     header, _ = recordio.unpack(s)
-                    a, b = int(header.label[0]), int(header.label[1])
-                    count = b - a
-                    if count < images_filter:
-                        continue
-                    self.id2range[identity] = (a, b)
-                    self.imgidx += range(a, b)
+                    if header.id2 == 1:
+                        ids = header.label.astype(np.int64).tolist()
+                        label = header.id
+                        self.id2range[identity] = ids
+                        # self.real_label2image[label] = ids
+                        self.imgidx += ids
+                    else:
+                        a, b = int(header.label[0]), int(header.label[1])
+                        count = b - a
+                        if count < images_filter:
+                            continue
+                        self.id2range[identity] = (a, b)
+                        self.imgidx += range(a, b)
                 print('id2range', len(self.id2range))
             else:
                 self.imgidx = list(self.imgrec.keys)

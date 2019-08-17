@@ -147,7 +147,7 @@ def parse_args():
     parser.add_argument('--bn-mom', type=float, default=0.9, help='bn mom')
     parser.add_argument('--mom', type=float, default=0.9, help='momentum')
     parser.add_argument('--emb-size', type=int, default=512, help='embedding length')
-    parser.add_argument('--per-batch-size', type=int, default=16, help='batch size in each context')
+    parser.add_argument('--per-batch-size', type=int, default=32, help='batch size in each context')
     parser.add_argument('--margin-m', type=float, default=0.5, help='margin for loss,')
     parser.add_argument('--margin-s', type=float, default=64.0, help='scale for feature')
     parser.add_argument('--margin-a', type=float, default=1.0, help='')
@@ -560,7 +560,7 @@ def train_net(args):
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         p = 512.0 / args.batch_size
-        p = 1
+        p = 4
         for l in range(len(lr_steps)):
             # lr_steps[l] = int(lr_steps[l])
             lr_steps[l] = int(lr_steps[l] * p)
