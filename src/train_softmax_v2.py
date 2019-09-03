@@ -138,7 +138,7 @@ def parse_args():
     parser.add_argument('--version-multiplier', type=float, default=1.0, help='filters multiplier')
     parser.add_argument('--version-act', type=str, default='prelu', help='network activation config')
     parser.add_argument('--use-deformable', type=int, default=0, help='use deformable cnn in network')
-    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
+    parser.add_argument('--lr', type=float, default=0.04, help='start learning rate')
     parser.add_argument('--lr-steps', type=str, default='', help='steps of lr changing')
     parser.add_argument('--wd', type=float, default=0.0005, help='weight decay')
     parser.add_argument('--fc7-wd-mult', type=float, default=1.0, help='weight decay mult for fc7')
@@ -147,7 +147,7 @@ def parse_args():
     parser.add_argument('--bn-mom', type=float, default=0.9, help='bn mom')
     parser.add_argument('--mom', type=float, default=0.9, help='momentum')
     parser.add_argument('--emb-size', type=int, default=512, help='embedding length')
-    parser.add_argument('--per-batch-size', type=int, default=32, help='batch size in each context')
+    parser.add_argument('--per-batch-size', type=int, default=16, help='batch size in each context')
     parser.add_argument('--margin-m', type=float, default=0.5, help='margin for loss,')
     parser.add_argument('--margin-s', type=float, default=64.0, help='scale for feature')
     parser.add_argument('--margin-a', type=float, default=1.0, help='')
@@ -164,7 +164,7 @@ def parse_args():
     parser.add_argument('--cutoff', type=int, default=0, help='cut off aug')
     parser.add_argument('--color', type=int, default=0, help='color jittering aug')
     parser.add_argument('--images-filter', type=int, default=0, help='minimum images per identity filter')
-    parser.add_argument('--target', type=str, default='cfp_fp', help='verification targets')
+    parser.add_argument('--target', type=str, default='', help='verification targets')
     parser.add_argument('--ce-loss', default=False, action='store_true', help='if output ce loss')
     args = parser.parse_args()
     return args
@@ -643,6 +643,8 @@ def train_net(args):
 
 
 def main():
+    import gluoncv
+    gluoncv.utils.random.seed(1)
     # time.sleep(3600*6.5)
     global args
     args = parse_args()
