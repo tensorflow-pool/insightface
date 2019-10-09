@@ -108,6 +108,9 @@ class FaceImageIter(io.DataIter):
     def num_samples(self):
         return len(self.seq)
 
+    def num_class(self):
+        return len(self.id2range)
+
     def next_sample(self):
         """Helper function for reading in next sample."""
         # set total batch size, for example, 1800, and maximum size for each people, for example 45

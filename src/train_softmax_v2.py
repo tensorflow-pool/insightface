@@ -117,7 +117,8 @@ def parse_args():
     # parser.add_argument('--data-dir', default='~/datasets/face_umd/faces_umd', help='training set directory')
     # parser.add_argument('--data-dir', default='~/datasets/ms1m-v1/faces_ms1m_112x112', help='training set directory')
     # parser.add_argument('--data-dir', default='~/datasets/glintasia', help='training set directory')
-    parser.add_argument('--data-dir', default='~/datasets/maysa/', help='training set directory')
+    parser.add_argument('--data-dir', default='~/datasets/maysa', help='training set directory')
+    parser.add_argument('--rec', default='project_xm_huafu_5573k_q95_retina_pred_0.6_10.rec', help='training set directory')
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
     parser.add_argument('--pretrained', default='../models/model-r34-amf/model,0', help='pretrained model to load')
@@ -449,32 +450,35 @@ def train_net(args):
     args.image_channel = 3
 
     os.environ['BETA'] = str(args.beta)
-    data_dir_list = args.data_dir.split(',')
-    assert len(data_dir_list) == 1
-    data_dir = data_dir_list[0]
-    path_imgrec = None
-    path_imglist = None
-    # prop = face_image.load_property(data_dir)
-    # args.num_classes = prop.num_classes
-    args.num_classes = 44494
-    # image_size = prop.image_size
     image_size = [int(x) for x in args.image_size.split(',')]
     assert len(image_size) == 2
     assert image_size[0] == image_size[1]
     args.image_h = image_size[0]
     args.image_w = image_size[1]
     logging.info('image_size %s', image_size)
-    assert (args.num_classes > 0)
-    logging.info('num_classes %s', args.num_classes)
-    path_imgrec = os.path.join(data_dir, "project_xm_huafu_5573k_q95_retina_pred_0.6_10.rec")
 
+    path_imgrec = os.path.join(args.data_dir, args.rec)
     if args.loss_type == 1 and args.num_classes > 20000:
         args.beta_freeze = 5000
         args.gamma = 0.06
 
-    logging.info('Called with argument: %s', args)
     data_shape = (args.image_channel, image_size[0], image_size[1])
     mean = None
+    train_dataiter = FaceImageIter(
+        batch_size=args.batch_size,
+        data_shape=data_shape,
+        path_imgrec=path_imgrec,
+        shuffle=True,
+        rand_mirror=args.rand_mirror,
+        mean=mean,
+        cutoff=args.cutoff,
+        color_jittering=args.color,
+        images_filter=args.images_filter,
+    )
+    args.num_classes = train_dataiter.num_class()
+    assert (args.num_classes > 0)
+    logging.info('num_classes %s', args.num_classes)
+    logging.info('Called with argument: %s', args)
 
     begin_epoch = 0
     base_lr = args.lr
@@ -501,18 +505,6 @@ def train_net(args):
     )
     val_dataiter = None
 
-    train_dataiter = FaceImageIter(
-        batch_size=args.batch_size,
-        data_shape=data_shape,
-        path_imgrec=path_imgrec,
-        shuffle=True,
-        rand_mirror=args.rand_mirror,
-        mean=mean,
-        cutoff=args.cutoff,
-        color_jittering=args.color,
-        images_filter=args.images_filter,
-    )
-
     eval_metrics = [mx.metric.create([AccMetric(), LossMetric(), AccMetric(True), LossMetric(True), ThetaMetric()])]
     if args.ce_loss:
         metric2 = LossValueMetric()
@@ -533,7 +525,7 @@ def train_net(args):
     ver_list = []
     ver_name_list = []
     for name in args.target.split(','):
-        path = os.path.join(data_dir, name + ".bin")
+        path = os.path.join(args.data_dir, name + ".bin")
         if os.path.exists(path):
             data_set = verification.load_bin(path, image_size)
             ver_list.append(data_set)
