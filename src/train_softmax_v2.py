@@ -138,7 +138,7 @@ def parse_args():
     parser.add_argument('--version-multiplier', type=float, default=1.0, help='filters multiplier')
     parser.add_argument('--version-act', type=str, default='prelu', help='network activation config')
     parser.add_argument('--use-deformable', type=int, default=0, help='use deformable cnn in network')
-    parser.add_argument('--lr', type=float, default=0.04, help='start learning rate')
+    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
     parser.add_argument('--lr-steps', type=str, default='', help='steps of lr changing')
     parser.add_argument('--wd', type=float, default=0.0005, help='weight decay')
     parser.add_argument('--fc7-wd-mult', type=float, default=1.0, help='weight decay mult for fc7')
@@ -147,7 +147,7 @@ def parse_args():
     parser.add_argument('--bn-mom', type=float, default=0.9, help='bn mom')
     parser.add_argument('--mom', type=float, default=0.9, help='momentum')
     parser.add_argument('--emb-size', type=int, default=512, help='embedding length')
-    parser.add_argument('--per-batch-size', type=int, default=16, help='batch size in each context')
+    parser.add_argument('--per-batch-size', type=int, default=96, help='batch size in each context')
     parser.add_argument('--margin-m', type=float, default=0.5, help='margin for loss,')
     parser.add_argument('--margin-s', type=float, default=64.0, help='scale for feature')
     parser.add_argument('--margin-a', type=float, default=1.0, help='')
@@ -164,7 +164,7 @@ def parse_args():
     parser.add_argument('--cutoff', type=int, default=0, help='cut off aug')
     parser.add_argument('--color', type=int, default=0, help='color jittering aug')
     parser.add_argument('--images-filter', type=int, default=0, help='minimum images per identity filter')
-    parser.add_argument('--target', type=str, default='', help='verification targets')
+    parser.add_argument('--target', type=str, default='cfp_fp', help='verification targets')
     parser.add_argument('--ce-loss', default=False, action='store_true', help='if output ce loss')
     args = parser.parse_args()
     return args
@@ -466,7 +466,7 @@ def train_net(args):
     logging.info('image_size %s', image_size)
     assert (args.num_classes > 0)
     logging.info('num_classes %s', args.num_classes)
-    path_imgrec = os.path.join(data_dir, "project_xm_huafu_5573k_q95_retina_pred_10_200.rec")
+    path_imgrec = os.path.join(data_dir, "project_xm_huafu_5573k_q95_retina_pred_0.6_10.rec")
 
     if args.loss_type == 1 and args.num_classes > 20000:
         args.beta_freeze = 5000
@@ -556,7 +556,7 @@ def train_net(args):
     #  highest_acc.append(0.0)
     global_step = [0]
     if len(args.lr_steps) == 0:
-        lr_steps = [40000, 60000, 80000]
+        lr_steps = [20000, 30000, 40000]
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         p = 512.0 / args.batch_size
