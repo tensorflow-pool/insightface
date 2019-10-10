@@ -117,7 +117,7 @@ def parse_args():
     # parser.add_argument('--data-dir', default='~/datasets/face_umd/faces_umd', help='training set directory')
     # parser.add_argument('--data-dir', default='~/datasets/ms1m-v1/faces_ms1m_112x112', help='training set directory')
     # parser.add_argument('--data-dir', default='~/datasets/glintasia', help='training set directory')
-    parser.add_argument('--data-dir', default='~/datasets/maysa', help='training set directory')
+    # parser.add_argument('--data-dir', default='~/datasets/maysa', help='training set directory')
     parser.add_argument('--data-dir', default='~/datasets/ms1m-retina', help='training set directory')
     parser.add_argument('--rec', default='train_65_70_maysa_0.6_10_filtered.rec', help='training set directory')
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
