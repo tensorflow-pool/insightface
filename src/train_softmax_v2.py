@@ -120,6 +120,9 @@ def parse_args():
     # parser.add_argument('--data-dir', default='~/datasets/maysa', help='training set directory')
     parser.add_argument('--data-dir', default='~/datasets/ms1m-retina', help='training set directory')
     parser.add_argument('--rec', default='train_65_70_maysa_0.6_10_filtered.rec', help='training set directory')
+    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
+    parser.add_argument('--target', type=str, default='lfw', help='verification targets')
+
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
     parser.add_argument('--pretrained', default='../models/model-r34-amf/model,0', help='pretrained model to load')
@@ -140,7 +143,6 @@ def parse_args():
     parser.add_argument('--version-multiplier', type=float, default=1.0, help='filters multiplier')
     parser.add_argument('--version-act', type=str, default='prelu', help='network activation config')
     parser.add_argument('--use-deformable', type=int, default=0, help='use deformable cnn in network')
-    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
     parser.add_argument('--lr-steps', type=str, default='', help='steps of lr changing')
     parser.add_argument('--wd', type=float, default=0.0005, help='weight decay')
     parser.add_argument('--fc7-wd-mult', type=float, default=1.0, help='weight decay mult for fc7')
@@ -166,7 +168,6 @@ def parse_args():
     parser.add_argument('--cutoff', type=int, default=0, help='cut off aug')
     parser.add_argument('--color', type=int, default=0, help='color jittering aug')
     parser.add_argument('--images-filter', type=int, default=0, help='minimum images per identity filter')
-    parser.add_argument('--target', type=str, default='lfw', help='verification targets')
     parser.add_argument('--ce-loss', default=False, action='store_true', help='if output ce loss')
     args = parser.parse_args()
     return args

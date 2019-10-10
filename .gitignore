@@ -126,3 +126,5 @@ models
 src/eval/ijb
 
 train
+
+src/nohup.out
