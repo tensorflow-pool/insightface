@@ -552,7 +552,9 @@ def train_net(args):
         lr_steps = [8, 12, 16]
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
-        p = train_dataiter.num_samples() / args.per_batch_size
+        p = train_dataiter.num_samples() / args.batch_size
+        # 加速
+        p = p / 2
         for l in range(len(lr_steps)):
             # lr_steps[l] = int(lr_steps[l])
             lr_steps[l] = int(lr_steps[l] * p)
