@@ -134,8 +134,6 @@ def parse_args():
     parser.add_argument('--ckpt', type=int, default=2,
                         help='checkpoint saving option. 0: discard saving. 1: save when necessary. 2: always save')
     parser.add_argument('--loss-type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
-    parser.add_argument('--check_save', type=int, default=10000,
-                        help='do verification testing and model saving every verbose batches')
     parser.add_argument('--max-steps', type=int, default=0, help='max training batches')
     parser.add_argument('--end-epoch', type=int, default=100000, help='training epoch size.')
     parser.add_argument('--network', default='r34', help='specify network')
@@ -594,7 +592,7 @@ def train_net(args):
         theta = model.get_outputs()[-1].asnumpy()
         sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
 
-        if mbatch % args.check_save == 0:
+        if mbatch % args.batch_size == 0:
             if len(ver_list) > 0:
                 acc_list = ver_test(mbatch)
                 logging.info('[%d]Accuracy-Highest: %s' % (mbatch, acc_list))
