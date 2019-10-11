@@ -118,8 +118,12 @@ def parse_args():
     # parser.add_argument('--data-dir', default='~/datasets/ms1m-v1/faces_ms1m_112x112', help='training set directory')
     # parser.add_argument('--data-dir', default='~/datasets/glintasia', help='training set directory')
     # parser.add_argument('--data-dir', default='~/datasets/maysa', help='training set directory')
+
     parser.add_argument('--data-dir', default='~/datasets/ms1m-retina', help='training set directory')
-    parser.add_argument('--rec', default='train_65_70_maysa_0.6_10_filtered.rec', help='training set directory')
+    parser.add_argument('--rec', default='train_65_70_maysa_0.6_10_filtered_merged.rec', help='training set directory')
+
+    # parser.add_argument('--data-dir', default='~/datasets/maysa', help='training set directory')
+    # parser.add_argument('--rec', default='project_xm_huafu_5573k_q95_retina_pred_0.6_10_filtered_merged.rec', help='training set directory')
     parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
     parser.add_argument('--target', type=str, default='lfw', help='verification targets')
 
@@ -555,7 +559,7 @@ def train_net(args):
         #     lr_steps = [100000, 140000, 160000]
         p = train_dataiter.num_samples() / args.batch_size
         # 加速
-        p = p / 2
+        # p = p / 2
         for l in range(len(lr_steps)):
             # lr_steps[l] = int(lr_steps[l])
             lr_steps[l] = int(lr_steps[l] * p)
