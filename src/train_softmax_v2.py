@@ -561,7 +561,7 @@ def train_net(args):
         #     lr_steps = [100000, 140000, 160000]
         p = train_dataiter.num_samples() / args.batch_size
         # 加速
-        if p > 40000:
+        if p > 20000:
             p = p / 2
         for l in range(len(lr_steps)):
             # lr_steps[l] = int(lr_steps[l])
