@@ -569,7 +569,8 @@ def train_net(args):
         args.max_steps = 2 * lr_steps[-1] - lr_steps[-2]
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
-    logging.info('lr_steps %s', lr_steps)
+    epoch_size = int(train_dataiter.num_samples() / args.batch_size)
+    logging.info('lr_steps %s epoch_size %s', lr_steps, epoch_size)
 
     def _batch_callback(param):
         # global global_step
@@ -597,7 +598,7 @@ def train_net(args):
         theta = model.get_outputs()[-1].asnumpy()
         sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
 
-        if mbatch % args.batch_size == 0:
+        if mbatch % epoch_size == 0:
             if len(ver_list) > 0:
                 acc_list = ver_test(mbatch)
                 logging.info('[%d]Accuracy-Highest: %s' % (mbatch, acc_list))
