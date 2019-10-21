@@ -549,6 +549,8 @@ def train_net(args):
             ver_list.append(data_set)
             ver_name_list.append(name)
             logging.info('ver %s', name)
+        else:
+            logging.info("path %s not existed")
 
     def ver_test(nbatch):
         results = []
