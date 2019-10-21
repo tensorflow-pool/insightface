@@ -157,7 +157,7 @@ def parse_args():
     parser.add_argument('--bn-mom', type=float, default=0.9, help='bn mom')
     parser.add_argument('--mom', type=float, default=0.9, help='momentum')
     parser.add_argument('--emb-size', type=int, default=512, help='embedding length')
-    parser.add_argument('--per-batch-size', type=int, default=48, help='batch size in each context')
+    parser.add_argument('--per-batch-size', type=int, default=64, help='batch size in each context')
     parser.add_argument('--margin-m', type=float, default=0.5, help='margin for loss,')
     parser.add_argument('--margin-s', type=float, default=64.0, help='scale for feature')
     parser.add_argument('--margin-a', type=float, default=1.0, help='')
@@ -174,7 +174,7 @@ def parse_args():
     parser.add_argument('--cutoff', type=int, default=0, help='cut off aug')
     parser.add_argument('--color', type=int, default=0, help='color jittering aug')
     parser.add_argument('--images-filter', type=int, default=0, help='minimum images per identity filter')
-    parser.add_argument('--ce-loss', default=False, action='store_true', help='if output ce loss')
+    parser.add_argument('--ce-loss', default=True, action='store_true', help='if output ce loss')
     args = parser.parse_args()
     return args
 
