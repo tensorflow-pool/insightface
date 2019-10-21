@@ -514,7 +514,7 @@ def train_net(args):
     val_dataiter = None
 
     eval_metrics = [mx.metric.create([AccMetric(), LossMetric(), AccMetric(True), LossMetric(True), ThetaMetric()])]
-    eval_metrics = []
+    # eval_metrics = []
     if args.ce_loss:
         metric2 = LossValueMetric()
         eval_metrics.append(mx.metric.create(metric2))
@@ -584,18 +584,18 @@ def train_net(args):
                 break
 
         _cb(param)
-        # acc = param.eval_metric.get_name_value()[0][1]
-        # loss = param.eval_metric.get_name_value()[1][1]
-        # real_acc = param.eval_metric.get_name_value()[2][1]
-        # real_loss = param.eval_metric.get_name_value()[3][1]
+        acc = param.eval_metric.get_name_value()[0][1]
+        loss = param.eval_metric.get_name_value()[1][1]
+        real_acc = param.eval_metric.get_name_value()[2][1]
+        real_loss = param.eval_metric.get_name_value()[3][1]
         if mbatch % 100 == 0:
             logging.info('lr-batch-epoch: lr %s, nbatch %s, epoch %s, step %s', opt.lr, param.nbatch, param.epoch, global_step[0])
 
         sw.add_scalar(tag='lr', value=opt.lr, global_step=mbatch)
-        # sw.add_scalar(tag='acc', value=acc, global_step=mbatch)
-        # sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
-        # sw.add_scalar(tag='real_acc', value=real_acc, global_step=mbatch)
-        # sw.add_scalar(tag='real_loss', value=real_loss, global_step=mbatch)
+        sw.add_scalar(tag='acc', value=acc, global_step=mbatch)
+        sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
+        sw.add_scalar(tag='real_acc', value=real_acc, global_step=mbatch)
+        sw.add_scalar(tag='real_loss', value=real_loss, global_step=mbatch)
         theta = model.get_outputs()[-1].asnumpy()
         sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
 
