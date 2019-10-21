@@ -556,13 +556,13 @@ def train_net(args):
     #  highest_acc.append(0.0)
     global_step = [0]
     if len(args.lr_steps) == 0:
-        lr_steps = [4, 8, 10]
+        lr_steps = [2, 4, 5]
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         p = train_dataiter.num_samples() / args.batch_size
         # 加速
-        if p > 20000:
-            p = p / 2
+        # if p > 20000:
+        #     p = p / 2
         for l in range(len(lr_steps)):
             # lr_steps[l] = int(lr_steps[l])
             lr_steps[l] = int(lr_steps[l] * p)
