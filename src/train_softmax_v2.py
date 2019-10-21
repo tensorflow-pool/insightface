@@ -600,7 +600,7 @@ def train_net(args):
         theta = model.get_outputs()[-1].asnumpy()
         sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
 
-        if mbatch % epoch_size == 0:
+        if mbatch == 101 or mbatch % epoch_size == 0:
             if len(ver_list) > 0:
                 acc_list = ver_test(mbatch)
                 logging.info('[%d]Accuracy-Highest: %s' % (mbatch, acc_list))
