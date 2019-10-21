@@ -136,7 +136,7 @@ def parse_args():
     # parser.add_argument('--pretrained', default='../models/model-r34-amf/model,0', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models/model-r34-7-19/model,172000', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models/r100-iccv/model,1', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='~/models/models_retina100_2019-10-18/model,324134', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='~/models/models_retina100_2019-10-18/model,486201', help='pretrained model to load')
     parser.add_argument('--loss-type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
     parser.add_argument('--max-steps', type=int, default=0, help='max training batches')
     parser.add_argument('--end-epoch', type=int, default=100000, help='training epoch size.')
@@ -584,18 +584,18 @@ def train_net(args):
                 break
 
         _cb(param)
-        acc = param.eval_metric.get_name_value()[0][1]
-        loss = param.eval_metric.get_name_value()[1][1]
-        real_acc = param.eval_metric.get_name_value()[2][1]
-        real_loss = param.eval_metric.get_name_value()[3][1]
+        # acc = param.eval_metric.get_name_value()[0][1]
+        # loss = param.eval_metric.get_name_value()[1][1]
+        # real_acc = param.eval_metric.get_name_value()[2][1]
+        # real_loss = param.eval_metric.get_name_value()[3][1]
         if mbatch % 100 == 0:
             logging.info('lr-batch-epoch: lr %s, nbatch %s, epoch %s, step %s', opt.lr, param.nbatch, param.epoch, global_step[0])
 
         sw.add_scalar(tag='lr', value=opt.lr, global_step=mbatch)
-        sw.add_scalar(tag='acc', value=acc, global_step=mbatch)
-        sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
-        sw.add_scalar(tag='real_acc', value=real_acc, global_step=mbatch)
-        sw.add_scalar(tag='real_loss', value=real_loss, global_step=mbatch)
+        # sw.add_scalar(tag='acc', value=acc, global_step=mbatch)
+        # sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
+        # sw.add_scalar(tag='real_acc', value=real_acc, global_step=mbatch)
+        # sw.add_scalar(tag='real_loss', value=real_loss, global_step=mbatch)
         theta = model.get_outputs()[-1].asnumpy()
         sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
 

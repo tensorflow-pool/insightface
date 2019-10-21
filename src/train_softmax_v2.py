@@ -136,7 +136,7 @@ def parse_args():
     # parser.add_argument('--pretrained', default='../models/model-r34-amf/model,0', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models/model-r34-7-19/model,172000', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models/r100-iccv/model,1', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='~/models/models_retina100_2019-10-18/model,324134', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='~/models/models_retina100_2019-10-18/model,486201', help='pretrained model to load')
     parser.add_argument('--loss-type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
     parser.add_argument('--max-steps', type=int, default=0, help='max training batches')
     parser.add_argument('--end-epoch', type=int, default=100000, help='training epoch size.')
