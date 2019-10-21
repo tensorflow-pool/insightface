@@ -79,7 +79,7 @@ class LossMetric(mx.metric.EvalMetric):
             softmax_val = preds[1]
         loss = -mx.ndarray.broadcast_mul(mx.ndarray.one_hot(mx.ndarray.array(labels[0], ctx=mx.gpu()), depth=args.num_classes, on_value=1, off_value=0), softmax_val.log()).sum(
             axis=1).mean()
-        self.sum_metric += loss.asnumpy()
+        # self.sum_metric += loss.asnumpy()
         self.num_inst += 1
 
 
