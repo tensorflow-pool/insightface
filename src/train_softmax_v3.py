@@ -128,7 +128,7 @@ def parse_args():
     parser.add_argument('--data-dir', default='~/datasets/maysa', help='training set directory')
     parser.add_argument('--rec', default='ms1m_maysa_0.5_10_300.rec', help='training set directory')
 
-    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
+    parser.add_argument('--lr', type=float, default=0.05, help='start learning rate')
     parser.add_argument('--target', type=str, default='lfw', help='verification targets')
 
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
@@ -157,7 +157,7 @@ def parse_args():
     parser.add_argument('--bn-mom', type=float, default=0.9, help='bn mom')
     parser.add_argument('--mom', type=float, default=0.9, help='momentum')
     parser.add_argument('--emb-size', type=int, default=512, help='embedding length')
-    parser.add_argument('--per-batch-size', type=int, default=64, help='batch size in each context')
+    parser.add_argument('--per-batch-size', type=int, default=80, help='batch size in each context')
     parser.add_argument('--margin-m', type=float, default=0.5, help='margin for loss,')
     parser.add_argument('--margin-s', type=float, default=64.0, help='scale for feature')
     parser.add_argument('--margin-a', type=float, default=1.0, help='')
@@ -558,7 +558,7 @@ def train_net(args):
     #  highest_acc.append(0.0)
     global_step = [0]
     if len(args.lr_steps) == 0:
-        lr_steps = [2, 4, 5]
+        lr_steps = [4, 8, 12]
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         p = train_dataiter.num_samples() / args.batch_size
@@ -587,12 +587,14 @@ def train_net(args):
         _cb(param)
         acc = param.eval_metric.get_name_value()[0][1]
         real_acc = param.eval_metric.get_name_value()[1][1]
+        loss = param.eval_metric.get_name_value()[2][1]
         if mbatch % 100 == 0:
             logging.info('lr-batch-epoch: lr %s, nbatch %s, epoch %s, step %s', opt.lr, param.nbatch, param.epoch, global_step[0])
 
         sw.add_scalar(tag='lr', value=opt.lr, global_step=mbatch)
         sw.add_scalar(tag='acc', value=acc, global_step=mbatch)
         sw.add_scalar(tag='real_acc', value=real_acc, global_step=mbatch)
+        sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
         theta = model.get_outputs()[-1].asnumpy()
         sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
 
