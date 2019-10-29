@@ -560,6 +560,7 @@ def train_net(args):
     global_step = [0]
     if len(args.lr_steps) == 0:
         lr_steps = [8, 12, 16]
+        lr_steps = [lr - 6 for lr in lr_steps]
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         p = train_dataiter.num_samples() / args.batch_size
