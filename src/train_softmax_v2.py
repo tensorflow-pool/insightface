@@ -126,9 +126,9 @@ def parse_args():
     # parser.add_argument('--rec', default='project_xm_huafu_5573k_q95_retina_pred_0.6_10_filtered_merged.rec', help='training set directory')
 
     parser.add_argument('--data-dir', default='~/datasets/maysa', help='training set directory')
-    parser.add_argument('--rec', default='ms1m_maysa_0.5_10_300.rec', help='training set directory')
+    parser.add_argument('--rec', default='maysa_0.5_10_300.rec', help='training set directory')
 
-    parser.add_argument('--lr', type=float, default=0.001, help='start learning rate')
+    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
     parser.add_argument('--target', type=str, default='lfw', help='verification targets')
 
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
@@ -558,7 +558,7 @@ def train_net(args):
     #  highest_acc.append(0.0)
     global_step = [0]
     if len(args.lr_steps) == 0:
-        lr_steps = [1, 2, 3]
+        lr_steps = [8, 12, 16]
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         p = train_dataiter.num_samples() / args.batch_size
