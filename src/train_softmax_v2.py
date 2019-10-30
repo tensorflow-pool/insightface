@@ -477,7 +477,7 @@ def train_net(args):
         batch_size=args.batch_size,
         data_shape=data_shape,
         path_imgrec=path_imgrec,
-        shuffle=False,
+        shuffle=True,
         rand_mirror=args.rand_mirror,
         mean=mean,
         cutoff=args.cutoff,
@@ -606,7 +606,7 @@ def train_net(args):
 
         _cb(param)
 
-        if mbatch == 101 or mbatch % epoch_size == 0:
+        if mbatch % epoch_size == 0:
             if len(ver_list) > 0:
                 acc_list = ver_test(mbatch)
                 logging.info('[%d]Accuracy-Highest: %s' % (mbatch, acc_list))
