@@ -594,7 +594,6 @@ def train_net(args):
                 logging.info('lr change to %s', opt.lr)
                 break
 
-        _cb(param)
         acc = param.eval_metric.get_name_value()[0][1]
         real_acc = param.eval_metric.get_name_value()[1][1]
         loss = param.eval_metric.get_name_value()[2][1]
@@ -607,6 +606,8 @@ def train_net(args):
         sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
         theta = model.get_outputs()[-1].asnumpy()
         sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
+
+        _cb(param)
 
         if mbatch % epoch_size == 0:
             if len(ver_list) > 0:

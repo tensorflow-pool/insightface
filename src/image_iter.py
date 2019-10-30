@@ -106,7 +106,7 @@ class FaceImageIter(io.DataIter):
             self.imgrec.reset()
 
     def num_samples(self):
-        return len(self.seq)
+        return len(self.imgidx)
 
     def num_class(self):
         return len(self.id2range)

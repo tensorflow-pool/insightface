@@ -79,6 +79,7 @@ class LossMetric(mx.metric.EvalMetric):
             softmax_val = preds[1]
         loss = -mx.ndarray.broadcast_mul(mx.ndarray.one_hot(mx.ndarray.array(labels[0], ctx=mx.gpu()), depth=args.num_classes, on_value=1, off_value=0), softmax_val.log()).sum(
             axis=1).mean()
+        # logging.info("loss %s", loss)
         self.sum_metric += loss.asnumpy()
         self.num_inst += 1
 
@@ -130,6 +131,7 @@ def parse_args():
 
     parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
     parser.add_argument('--target', type=str, default='lfw', help='verification targets')
+    parser.add_argument('--per-batch-size', type=int, default=48, help='batch size in each context')
 
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
@@ -157,7 +159,6 @@ def parse_args():
     parser.add_argument('--bn-mom', type=float, default=0.9, help='bn mom')
     parser.add_argument('--mom', type=float, default=0.9, help='momentum')
     parser.add_argument('--emb-size', type=int, default=512, help='embedding length')
-    parser.add_argument('--per-batch-size', type=int, default=48, help='batch size in each context')
     parser.add_argument('--margin-m', type=float, default=0.5, help='margin for loss,')
     parser.add_argument('--margin-s', type=float, default=64.0, help='scale for feature')
     parser.add_argument('--margin-a', type=float, default=1.0, help='')
@@ -476,7 +477,7 @@ def train_net(args):
         batch_size=args.batch_size,
         data_shape=data_shape,
         path_imgrec=path_imgrec,
-        shuffle=True,
+        shuffle=False,
         rand_mirror=args.rand_mirror,
         mean=mean,
         cutoff=args.cutoff,
@@ -529,7 +530,7 @@ def train_net(args):
     _rescale = 1.0 / args.ctx_num
     opt = optimizer.SGD(learning_rate=base_lr, momentum=base_mom, wd=base_wd, rescale_grad=_rescale)
     som = 20
-    _cb = mx.callback.Speedometer(args.batch_size, som)
+    _cb = mx.callback.Speedometer(args.batch_size, som, auto_reset=True)
 
     ver_list = []
     ver_name_list = []
@@ -586,7 +587,6 @@ def train_net(args):
                 logging.info('lr change to %s', opt.lr)
                 break
 
-        _cb(param)
         acc = param.eval_metric.get_name_value()[0][1]
         loss = param.eval_metric.get_name_value()[1][1]
         real_acc = param.eval_metric.get_name_value()[2][1]
@@ -599,8 +599,12 @@ def train_net(args):
         sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
         sw.add_scalar(tag='real_acc', value=real_acc, global_step=mbatch)
         sw.add_scalar(tag='real_loss', value=real_loss, global_step=mbatch)
-        theta = model.get_outputs()[-1].asnumpy()
+        theta = model.get_outputs()[3].asnumpy()
         sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
+        # logging.info('nbatch %s, epoch %s, step %s acc %s loss %s real_acc %s real_loss %s theta %s',
+        #              param.nbatch, param.epoch, global_step[0], acc, loss, real_acc, real_loss, theta.mean())
+
+        _cb(param)
 
         if mbatch == 101 or mbatch % epoch_size == 0:
             if len(ver_list) > 0:
@@ -652,6 +656,8 @@ def train_net(args):
 def main():
     import gluoncv
     gluoncv.utils.random.seed(1)
+    import random
+    random.seed(1)
     # time.sleep(3600*6.5)
     global args
     args = parse_args()
