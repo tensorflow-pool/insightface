@@ -200,7 +200,7 @@ def parse_args():
     parser.add_argument('--rec', default='glint_maysa_0.5_10_300.rec', help='training set directory')
 
     parser.add_argument('--lr', type=float, default=0.05, help='start learning rate')
-    parser.add_argument('--target', type=str, default='', help='verification targets')
+    parser.add_argument('--target', type=str, default='lfw', help='verification targets')
     parser.add_argument('--per-batch-size', type=int, default=48, help='batch size in each context')
 
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
