@@ -208,7 +208,8 @@ def parse_args():
     # parser.add_argument('--pretrained', default='../models/model-r34-amf/model,0', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models/model-r34-7-19/model,172000', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models/r100-iccv/model,1', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='~/models/models_retina100_2019-10-18/model,486201', help='pretrained model to load')
+    # parser.add_argument('--pretrained', default='~/models/models_retina100_2019-10-18/model,486201', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='', help='pretrained model to load')
     parser.add_argument('--loss-type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
     parser.add_argument('--max-steps', type=int, default=0, help='max training batches')
     parser.add_argument('--end-epoch', type=int, default=100000, help='training epoch size.')
@@ -508,7 +509,7 @@ def get_symbol(args, arg_params, aux_params):
         out_list.append(mx.symbol.BlockGrad(ce_loss))
     extra_loss_val = -mx.sym.sum(mx.sym.log(origin_softmax_fc7), axis=-1) / args.num_classes
     # 5 extra loss
-    out_list.append(mx.sym.make_loss(0.05 * extra_loss * extra_loss_val, name="extra_loss"))
+    out_list.append(mx.sym.make_loss(0.01 * extra_loss * extra_loss_val, name="extra_loss"))
     if DEBUG:
         # 67
         out_list.append(mx.symbol.BlockGrad(cos_t))
@@ -732,17 +733,24 @@ def train_net(args):
                 "cos1 %s cos2 %s embedding_mean %s embedding_mean1 %s weight_mean %s data_mean %s pre_fc1 %s stage2_unit4_bn3 %s stage1_unit3_bn3 %s bn0 %s conv0 %s conv0_weight %s, origin_softmax %s extra_loss %s",
                 cos1, cos2, embedding_mean, embedding_mean1, weight_mean, data_mean, pre_fc1, stage2_unit4_bn3, stage1_unit3_bn3, bn0, conv0, conv0_weight, origin_softmax,
                 extra_loss)
+        if mbatch % 20 == 0:
+            arg, aux = model.get_params()
+            conv0_weight = arg['conv0_weight'].asnumpy()
+            conv0_weight_grad = model._exec_group.grad_arrays[0][0].asnumpy()
+            logging.info("conv0_weight %s %s conv0_weight_grad %s %s", conv0_weight.max(), conv0_weight.min(), conv0_weight_grad.max(), conv0_weight_grad.min())
+
+            sw.add_histogram(tag="conv0_weight", values=conv0_weight, global_step=mbatch, bins=100)
+            sw.add_scalar(tag="conv0_weight_max", value=conv0_weight.max(), global_step=mbatch)
+            sw.add_scalar(tag="conv0_weight_min", value=conv0_weight.min(), global_step=mbatch)
+            sw.add_histogram(tag="conv0_weight_grad", values=conv0_weight_grad, global_step=mbatch, bins=100)
+            sw.add_scalar(tag="conv0_weight_grad_max", value=conv0_weight_grad.max(), global_step=mbatch)
+            sw.add_scalar(tag="conv0_weight_grad_min", value=conv0_weight_grad.min(), global_step=mbatch)
+
         theta = model.get_outputs()[3].asnumpy()
         # logging.info("theta %s", theta)
         sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
         # logging.info('nbatch %s, epoch %s, step %s acc %s loss %s real_acc %s real_loss %s theta %s',
         #              param.nbatch, param.epoch, global_step[0], acc, loss, real_acc, real_loss, theta.mean())
-        if mbatch % 20 == 0:
-            arg, aux = model.get_params()
-            conv0_weight = arg['conv0_weight'].asnumpy()
-            sw.add_histogram(tag="conv0_weight", values=conv0_weight, global_step=mbatch, bins=100)
-            sw.add_scalar(tag="conv0_weight_max", value=conv0_weight.max(), global_step=mbatch)
-            sw.add_scalar(tag="conv0_weight_min", value=conv0_weight.min(), global_step=mbatch)
 
         _cb(param)
 
