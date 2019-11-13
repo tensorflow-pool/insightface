@@ -199,7 +199,7 @@ def parse_args():
     parser.add_argument('--data-dir', default='~/datasets/maysa', help='training set directory')
     parser.add_argument('--rec', default='glint_maysa_0.5_10_300.rec', help='training set directory')
 
-    parser.add_argument('--lr', type=float, default=0.05, help='start learning rate')
+    parser.add_argument('--lr', type=float, default=0.1, help='start learning rate')
     parser.add_argument('--target', type=str, default='lfw', help='verification targets')
     parser.add_argument('--per-batch-size', type=int, default=48, help='batch size in each context')
 
@@ -207,9 +207,9 @@ def parse_args():
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models/model-r34-amf/model,0', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models/model-r34-7-19/model,172000', help='pretrained model to load')
-    # parser.add_argument('--pretrained', default='../models/r100-iccv/model,1', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='~/models/r100-iccv/model,1', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='~/models/models_retina100_2019-10-18/model,486201', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='', help='pretrained model to load')
+    # parser.add_argument('--pretrained', default='', help='pretrained model to load')
     parser.add_argument('--loss-type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
     parser.add_argument('--max-steps', type=int, default=0, help='max training batches')
     parser.add_argument('--end-epoch', type=int, default=100000, help='training epoch size.')
@@ -616,8 +616,9 @@ def train_net(args):
         if "fc7_weight" in arg_params:
             arg_params['fc7_weight'] = arg_params['fc7_weight'][-args.num_classes:, :]
 
-        # conv0_weight = arg_params['conv0_weight'].mean(axis=(1, 2, 3))
-        # logging.info("conv0_weight %s", conv0_weight)
+        conv0_weight = arg_params['conv0_weight'].asnumpy()
+        logging.info("conv0_weight %s %s", conv0_weight.max(), conv0_weight.min())
+        # sys.exit()
         sym, arg_params, aux_params = get_symbol(args, arg_params, aux_params)
 
     # label_name = 'softmax_label'
@@ -675,7 +676,7 @@ def train_net(args):
     global_step = [0]
     if len(args.lr_steps) == 0:
         lr_steps = [8, 12, 16]
-        lr_steps = [3, 6, 8]
+        lr_steps = [5, 8, 10]
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         p = train_dataiter.num_samples() / args.batch_size
