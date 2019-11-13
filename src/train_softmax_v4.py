@@ -45,22 +45,38 @@ class AccMetric(mx.metric.EvalMetric):
         self.count = 0
 
     def update(self, labels, preds):
+        # 1embedding
+        # 2loss
+        # 3real loss
+        # 4real t
+        # 5 extra loss
         self.count += 1
-        label = labels[0]
+
         if self.real:
             pred_label = preds[2]
         else:
             pred_label = preds[1]
+
+        label = labels[0] - 1
+        indexes = []
+        for index, l in enumerate(label):
+            if l != -1:
+                indexes.append(index)
+        if len(indexes) == 0:
+            return
+
+        label = label[indexes]
+        pred_label = pred_label[indexes]
         if pred_label.shape != label.shape:
             pred_label = mx.ndarray.argmax(pred_label, axis=self.axis)
         pred_label = pred_label.asnumpy().astype('int32').flatten()
-        label = label.asnumpy()
+
         if label.ndim == 2:
             label = label[:, 0]
-        label = label.astype('int32').flatten()
+        label = label.asnumpy().astype('int32').flatten()
         assert label.shape == pred_label.shape
         self.sum_metric += (pred_label.flat == label.flat).sum()
-        self.num_inst += len(pred_label.flat)
+        self.num_inst += len(indexes)
 
 
 class LossMetric(mx.metric.EvalMetric):
@@ -72,16 +88,53 @@ class LossMetric(mx.metric.EvalMetric):
         self.count = 0
 
     def update(self, labels, preds):
+        # 1embedding
+        # 2loss
+        # 3real loss
+        # 4real t
+        # 5 extra loss
         self.count += 1
+        label = labels[0] - 1
         if self.real:
             softmax_val = preds[2]
         else:
             softmax_val = preds[1]
-        loss = -mx.ndarray.broadcast_mul(mx.ndarray.one_hot(mx.ndarray.array(labels[0], ctx=mx.gpu()), depth=args.num_classes, on_value=1, off_value=0), softmax_val.log()).sum(
-            axis=1).mean()
-        # logging.info("loss %s", loss)
-        self.sum_metric += loss.asnumpy()
-        self.num_inst += 1
+
+        indexes = []
+        for index, l in enumerate(label):
+            if l != -1:
+                indexes.append(index)
+        if len(indexes) == 0:
+            return
+        label = label[indexes]
+        softmax_val = softmax_val[indexes]
+        one_hot = mx.ndarray.one_hot(mx.ndarray.array(label, ctx=mx.gpu()), depth=args.num_classes, on_value=1, off_value=0)
+        loss = -mx.ndarray.broadcast_mul(one_hot, softmax_val.log()).sum().asnumpy()
+        self.sum_metric += loss
+        self.num_inst += len(indexes)
+        # logging.info("loss real %s count %s loss %s", self.real, count, loss)
+
+
+class ExtraLossMetric(mx.metric.EvalMetric):
+    def __init__(self):
+        super(ExtraLossMetric, self).__init__("extra_loss")
+        self.losses = []
+        self.count = 0
+
+    def update(self, labels, preds):
+        # 1embedding
+        # 2loss
+        # 3real loss
+        # 4real t
+        # 5 extra loss
+        self.count += 1
+        cur_loss = preds[-1].sum().asnumpy()
+        self.sum_metric += cur_loss
+
+        label = labels[0]
+        cout = mx.ndarray.where(label, mx.nd.zeros_like(label), mx.nd.ones_like(label)).sum().asnumpy()
+        self.num_inst += cout
+        # logging.info("loss cout %s ExtraLossMetric %s", cout, cur_loss)
 
 
 class ThetaMetric(mx.metric.EvalMetric):
@@ -91,9 +144,16 @@ class ThetaMetric(mx.metric.EvalMetric):
         self.losses = []
 
     def update(self, labels, preds):
+        # 1embedding
+        # 2loss
+        # 3real loss
+        # 4real t
+        # 5 extra loss
         theta = preds[3].asnumpy()
-        self.sum_metric += theta.mean()
-        self.num_inst += 1.0
+        self.sum_metric += theta.sum()
+        l = labels[0]
+        count = mx.ndarray.where(l, mx.nd.ones_like(l), mx.nd.zeros_like(l)).sum().asnumpy()
+        self.num_inst += count
 
 
 class LossValueMetric(mx.metric.EvalMetric):
@@ -127,11 +187,11 @@ def parse_args():
     # parser.add_argument('--rec', default='project_xm_huafu_5573k_q95_retina_pred_0.6_10_filtered_merged.rec', help='training set directory')
 
     parser.add_argument('--data-dir', default='~/datasets/maysa', help='training set directory')
-    parser.add_argument('--rec', default='maysa_0.5_10_300.rec', help='training set directory')
+    parser.add_argument('--rec', default='glint_maysa_0.5_10_300.rec', help='training set directory')
 
-    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
-    parser.add_argument('--target', type=str, default='lfw', help='verification targets')
-    parser.add_argument('--per-batch-size', type=int, default=48, help='batch size in each context')
+    parser.add_argument('--lr', type=float, default=0.001, help='start learning rate')
+    parser.add_argument('--target', type=str, default='', help='verification targets')
+    parser.add_argument('--per-batch-size', type=int, default=16, help='batch size in each context')
 
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
@@ -228,8 +288,9 @@ def get_symbol(args, arg_params, aux_params):
                                        version_output=args.version_output, version_unit=args.version_unit,
                                        version_act=args.version_act)
     all_label = mx.symbol.Variable('softmax_label')
-    gt_label = all_label
-    extra_loss = None
+    gt_label = all_label - 1
+    base_loss = mx.sym.where(all_label, mx.sym.ones_like(all_label), mx.symbol.zeros_like(all_label))
+    extra_loss = mx.sym.where(all_label, mx.sym.zeros_like(all_label), mx.symbol.ones_like(all_label))
     _weight = mx.symbol.Variable("fc7_weight", shape=(args.num_classes, args.emb_size), lr_mult=args.fc7_lr_mult,
                                  wd_mult=args.fc7_wd_mult)
     if args.loss_type == 0:  # softmax
@@ -259,8 +320,8 @@ def get_symbol(args, arg_params, aux_params):
         gt_one_hot = mx.sym.one_hot(gt_label, depth=args.num_classes, on_value=s_m, off_value=0.0)
         fc7 = fc7 - gt_one_hot
     elif args.loss_type == 4:  # arc
-        s = args.margin_s
-        m = args.margin_m
+        s = args.margin_s  # 64
+        m = args.margin_m  # 0.5
         assert s > 0.0
         assert m >= 0.0
         assert m < (math.pi / 2)
@@ -402,11 +463,21 @@ def get_symbol(args, arg_params, aux_params):
             gt_one_hot = mx.sym.one_hot(gt_label, depth=args.num_classes, on_value=1.0, off_value=0.0)
             body = mx.sym.broadcast_mul(gt_one_hot, diff)
             fc7 = fc7 + body
+    # 1embedding
     out_list = [mx.symbol.BlockGrad(embedding)]
     softmax = mx.symbol.SoftmaxOutput(data=fc7, label=gt_label, name='softmax', normalization='valid')
-    out_list.append(softmax)
-    out_list.append(mx.symbol.BlockGrad(mx.symbol.softmax(origin_fc7)))
-    out_list.append(mx.symbol.BlockGrad(origin_t))
+    base_loss_expanded = mx.sym.expand_dims(base_loss, -1)
+    base_loss_val = mx.sym.make_loss(mx.sym.broadcast_mul(base_loss_expanded, softmax), name="base_loss")
+    # 2loss
+    out_list.append(base_loss_val)
+    # 3real loss
+    origin_softmax_fc7 = mx.symbol.softmax(origin_fc7)
+    out_list.append(mx.symbol.BlockGrad(mx.sym.broadcast_mul(base_loss_expanded, origin_softmax_fc7)))
+    # out_list.append(mx.symbol.BlockGrad(mx.symbol.softmax(fc7)))
+    # origin_softmax_fc7 = mx.symbol.softmax(origin_fc7)
+    # out_list.append(mx.symbol.BlockGrad(origin_softmax_fc7))
+    # 4real t
+    out_list.append(mx.symbol.BlockGrad(mx.sym.broadcast_mul(base_loss, origin_t)))
     if args.loss_type == 6:
         out_list.append(intra_loss)
     if args.loss_type == 7:
@@ -421,7 +492,11 @@ def get_symbol(args, arg_params, aux_params):
         body = body * _label
         ce_loss = mx.symbol.sum(body) / args.per_batch_size
         out_list.append(mx.symbol.BlockGrad(ce_loss))
+    extra_loss_val = -mx.sym.sum(mx.sym.log(origin_softmax_fc7), axis=-1)
+    # 5 extra loss
+    out_list.append(mx.sym.make_loss(0.00001 * extra_loss * extra_loss_val, name="extra_loss"))
     out = mx.symbol.Group(out_list)
+    #
     return (out, arg_params, aux_params)
 
 
@@ -484,7 +559,7 @@ def train_net(args):
         color_jittering=args.color,
         images_filter=args.images_filter,
     )
-    args.num_classes = train_dataiter.num_class()
+    args.num_classes = train_dataiter.num_class() - 1
     assert (args.num_classes > 0)
     logging.info('num_classes %s', args.num_classes)
     logging.info('Called with argument: %s', args)
@@ -515,7 +590,8 @@ def train_net(args):
     )
     val_dataiter = None
 
-    eval_metrics = [mx.metric.create([AccMetric(), AccMetric(True), LossMetric(), LossMetric(True), ThetaMetric()])]
+    eval_metrics = [mx.metric.create([AccMetric(), AccMetric(True), LossMetric(), LossMetric(True), ExtraLossMetric(), ThetaMetric()])]
+    # eval_metrics = []
     if args.ce_loss:
         metric2 = LossValueMetric()
         eval_metrics.append(mx.metric.create(metric2))
@@ -542,7 +618,7 @@ def train_net(args):
             ver_name_list.append(name)
             logging.info('ver %s', name)
         else:
-            logging.info("path %s not existed")
+            logging.info("path %s not existed", path)
 
     def ver_test(nbatch):
         results = []
@@ -599,8 +675,9 @@ def train_net(args):
         sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
         sw.add_scalar(tag='real_acc', value=real_acc, global_step=mbatch)
         sw.add_scalar(tag='real_loss', value=real_loss, global_step=mbatch)
-        theta = model.get_outputs()[3].asnumpy()
-        sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
+        theta = model.get_outputs()[4].asnumpy()
+        # sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
+        # logging.info("theta %s", theta)
         # logging.info('nbatch %s, epoch %s, step %s acc %s loss %s real_acc %s real_loss %s theta %s',
         #              param.nbatch, param.epoch, global_step[0], acc, loss, real_acc, real_loss, theta.mean())
 
