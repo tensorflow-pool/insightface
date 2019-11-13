@@ -485,7 +485,9 @@ def get_symbol(args, arg_params, aux_params):
     # origin_softmax_fc7 = mx.symbol.softmax(origin_fc7)
     # out_list.append(mx.symbol.BlockGrad(origin_softmax_fc7))
     # 4real t
-    out_list.append(mx.symbol.BlockGrad(mx.sym.broadcast_mul(base_loss, origin_t)))
+    # out_list.append(mx.symbol.BlockGrad(mx.sym.broadcast_mul(base_loss, origin_t)))
+    # 不要归零，看看iqiyi loss 是否有效
+    out_list.append(mx.symbol.BlockGrad(origin_t))
     if args.loss_type == 6:
         out_list.append(intra_loss)
     if args.loss_type == 7:
@@ -502,7 +504,7 @@ def get_symbol(args, arg_params, aux_params):
         out_list.append(mx.symbol.BlockGrad(ce_loss))
     extra_loss_val = -mx.sym.sum(mx.sym.log(origin_softmax_fc7), axis=-1)
     # 5 extra loss
-    out_list.append(mx.sym.make_loss(0.00002 * extra_loss * extra_loss_val, name="extra_loss"))
+    out_list.append(mx.sym.make_loss(0.00001 * extra_loss * extra_loss_val, name="extra_loss"))
     out = mx.symbol.Group(out_list)
     #
     return (out, arg_params, aux_params)
