@@ -150,10 +150,18 @@ class ThetaMetric(mx.metric.EvalMetric):
         # 4real t
         # 5 extra loss
         theta = preds[3].asnumpy()
+
+        label = labels[0] - 1
+        indexes = []
+        for index, l in enumerate(label):
+            if l != -1:
+                indexes.append(index)
+        if len(indexes) == 0:
+            return
+
+        theta = theta[indexes]
         self.sum_metric += theta.sum()
-        l = labels[0]
-        count = mx.ndarray.where(l, mx.nd.ones_like(l), mx.nd.zeros_like(l)).sum().asnumpy()
-        self.num_inst += count
+        self.num_inst += len(indexes)
 
 
 class LossValueMetric(mx.metric.EvalMetric):
@@ -494,7 +502,7 @@ def get_symbol(args, arg_params, aux_params):
         out_list.append(mx.symbol.BlockGrad(ce_loss))
     extra_loss_val = -mx.sym.sum(mx.sym.log(origin_softmax_fc7), axis=-1)
     # 5 extra loss
-    out_list.append(mx.sym.make_loss(0.00001 * extra_loss * extra_loss_val, name="extra_loss"))
+    out_list.append(mx.sym.make_loss(0.00002 * extra_loss * extra_loss_val, name="extra_loss"))
     out = mx.symbol.Group(out_list)
     #
     return (out, arg_params, aux_params)
@@ -675,8 +683,8 @@ def train_net(args):
         sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
         sw.add_scalar(tag='real_acc', value=real_acc, global_step=mbatch)
         sw.add_scalar(tag='real_loss', value=real_loss, global_step=mbatch)
-        theta = model.get_outputs()[4].asnumpy()
-        # sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
+        theta = model.get_outputs()[3].asnumpy()
+        sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
         # logging.info("theta %s", theta)
         # logging.info('nbatch %s, epoch %s, step %s acc %s loss %s real_acc %s real_loss %s theta %s',
         #              param.nbatch, param.epoch, global_step[0], acc, loss, real_acc, real_loss, theta.mean())
