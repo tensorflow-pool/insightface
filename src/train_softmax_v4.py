@@ -735,6 +735,11 @@ def train_net(args):
         theta = model.get_outputs()[3].asnumpy()
         # logging.info("theta %s", theta)
         sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
+        arg, aux = model.get_params()
+        conv0_weight = arg['conv0_weight']
+        sw.add_histogram(tag="conv0_weight", values=conv0_weight, global_step=mbatch, bins=100)
+        sw.add_scalar(tag="conv0_weight_max", value=conv0_weight.max().asnumpy(), global_step=mbatch)
+        sw.add_scalar(tag="conv0_weight_min", value=conv0_weight.min().asnumpy(), global_step=mbatch)
         # logging.info('nbatch %s, epoch %s, step %s acc %s loss %s real_acc %s real_loss %s theta %s',
         #              param.nbatch, param.epoch, global_step[0], acc, loss, real_acc, real_loss, theta.mean())
 
