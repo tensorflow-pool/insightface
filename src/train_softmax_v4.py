@@ -342,7 +342,7 @@ def get_symbol(args, arg_params, aux_params):
         cos_t = zy / s
         # 避免ｎａｎ出现
         cal_cos_t = mx.sym.where(cos_t > 1, mx.sym.ones_like(cos_t), cos_t)
-        cal_cos_t = mx.sym.where(cal_cos_t < -1, -mx.sym.ones_like(cos_t), cal_cos_t)
+        cal_cos_t = mx.sym.where(cal_cos_t < -1, -mx.sym.ones_like(cal_cos_t), cal_cos_t)
         origin_t = mx.sym.degrees(mx.sym.arccos(cal_cos_t))
         cos_m = math.cos(m)
         sin_m = math.sin(m)
@@ -504,9 +504,9 @@ def get_symbol(args, arg_params, aux_params):
         body = body * _label
         ce_loss = mx.symbol.sum(body) / args.per_batch_size
         out_list.append(mx.symbol.BlockGrad(ce_loss))
-    extra_loss_val = -mx.sym.sum(mx.sym.log(origin_softmax_fc7), axis=-1)
+    extra_loss_val = -mx.sym.sum(mx.sym.log(origin_softmax_fc7), axis=-1) / args.num_classes
     # 5 extra loss
-    out_list.append(mx.sym.make_loss(0.00002 * extra_loss * extra_loss_val, name="extra_loss"))
+    out_list.append(mx.sym.make_loss(0.1 * extra_loss * extra_loss_val, name="extra_loss"))
     out = mx.symbol.Group(out_list)
     #
     return (out, arg_params, aux_params)
