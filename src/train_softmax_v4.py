@@ -340,9 +340,9 @@ def get_symbol(args, arg_params, aux_params):
         origin_fc7 = fc7
         zy = mx.sym.pick(fc7, gt_label, axis=1)
         cos_t = zy / s
-        #避免ｎａｎ出现
-        cal_cos_t = mx.sym.where(cos_t > 1, 1, cos_t)
-        cal_cos_t = mx.sym.where(cal_cos_t < -1, -1, cal_cos_t)
+        # 避免ｎａｎ出现
+        cal_cos_t = mx.sym.where(cos_t > 1, mx.sym.ones_like(cos_t), cos_t)
+        cal_cos_t = mx.sym.where(cal_cos_t < -1, -mx.sym.ones_like(cos_t), cal_cos_t)
         origin_t = mx.sym.degrees(mx.sym.arccos(cal_cos_t))
         cos_m = math.cos(m)
         sin_m = math.sin(m)
