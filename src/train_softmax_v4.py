@@ -197,7 +197,7 @@ def parse_args():
     parser.add_argument('--data-dir', default='~/datasets/maysa', help='training set directory')
     parser.add_argument('--rec', default='glint_maysa_0.5_10_300.rec', help='training set directory')
 
-    parser.add_argument('--lr', type=float, default=0.001, help='start learning rate')
+    parser.add_argument('--lr', type=float, default=0.05, help='start learning rate')
     parser.add_argument('--target', type=str, default='lfw', help='verification targets')
     parser.add_argument('--per-batch-size', type=int, default=48, help='batch size in each context')
 
@@ -506,7 +506,7 @@ def get_symbol(args, arg_params, aux_params):
         out_list.append(mx.symbol.BlockGrad(ce_loss))
     extra_loss_val = -mx.sym.sum(mx.sym.log(origin_softmax_fc7), axis=-1)
     # 5 extra loss
-    out_list.append(mx.sym.make_loss(0.00001 * extra_loss * extra_loss_val, name="extra_loss"))
+    out_list.append(mx.sym.make_loss(0.00002 * extra_loss * extra_loss_val, name="extra_loss"))
     out = mx.symbol.Group(out_list)
     #
     return (out, arg_params, aux_params)
@@ -615,7 +615,7 @@ def train_net(args):
     else:
         initializer = mx.init.Xavier(rnd_type='uniform', factor_type="in", magnitude=2)
     # initializer = mx.init.Xavier(rnd_type='gaussian', factor_type="out", magnitude=2) #resnet style
-    _rescale = 1.0 / args.ctx_num
+    _rescale = 1.0 / args.ctx_num / args.batch_size
     opt = optimizer.SGD(learning_rate=base_lr, momentum=base_mom, wd=base_wd, rescale_grad=_rescale)
     som = 20
     _cb = mx.callback.Speedometer(args.batch_size, som, auto_reset=True)
