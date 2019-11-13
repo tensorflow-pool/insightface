@@ -341,8 +341,8 @@ def get_symbol(args, arg_params, aux_params):
         zy = mx.sym.pick(fc7, gt_label, axis=1)
         cos_t = zy / s
         # 避免ｎａｎ出现
-        cal_cos_t = mx.sym.where(cos_t > 1, mx.sym.ones_like(cos_t), cos_t)
-        cal_cos_t = mx.sym.where(cal_cos_t < -1, -mx.sym.ones_like(cal_cos_t), cal_cos_t)
+        cal_cos_t = mx.sym.where(cos_t > 0.99999, mx.sym.ones_like(cos_t) - 0.000001, cos_t)
+        cal_cos_t = mx.sym.where(cal_cos_t < -0.99999, -mx.sym.ones_like(cal_cos_t) + 0.000001, cal_cos_t)
         origin_t = mx.sym.degrees(mx.sym.arccos(cal_cos_t))
         cos_m = math.cos(m)
         sin_m = math.sin(m)
@@ -506,7 +506,7 @@ def get_symbol(args, arg_params, aux_params):
         out_list.append(mx.symbol.BlockGrad(ce_loss))
     extra_loss_val = -mx.sym.sum(mx.sym.log(origin_softmax_fc7), axis=-1) / args.num_classes
     # 5 extra loss
-    out_list.append(mx.sym.make_loss(0.1 * extra_loss * extra_loss_val, name="extra_loss"))
+    out_list.append(mx.sym.make_loss(0.2 * extra_loss * extra_loss_val, name="extra_loss"))
     out = mx.symbol.Group(out_list)
     #
     return (out, arg_params, aux_params)
@@ -688,8 +688,8 @@ def train_net(args):
         sw.add_scalar(tag='real_acc', value=real_acc, global_step=mbatch)
         sw.add_scalar(tag='real_loss', value=real_loss, global_step=mbatch)
         theta = model.get_outputs()[3].asnumpy()
-        sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
         # logging.info("theta %s", theta)
+        sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
         # logging.info('nbatch %s, epoch %s, step %s acc %s loss %s real_acc %s real_loss %s theta %s',
         #              param.nbatch, param.epoch, global_step[0], acc, loss, real_acc, real_loss, theta.mean())
 
