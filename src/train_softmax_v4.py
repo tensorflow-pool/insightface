@@ -508,7 +508,7 @@ def get_symbol(args, arg_params, aux_params):
         out_list.append(mx.symbol.BlockGrad(ce_loss))
     extra_loss_val = -mx.sym.sum(mx.sym.log(origin_softmax_fc7), axis=-1) / args.num_classes
     # 5 extra loss
-    out_list.append(mx.sym.make_loss(0.01 * extra_loss * extra_loss_val, name="extra_loss"))
+    out_list.append(mx.sym.make_loss(0.05 * extra_loss * extra_loss_val, name="extra_loss"))
     if DEBUG:
         # 67
         out_list.append(mx.symbol.BlockGrad(cos_t))
@@ -735,13 +735,14 @@ def train_net(args):
         theta = model.get_outputs()[3].asnumpy()
         # logging.info("theta %s", theta)
         sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
-        # arg, aux = model.get_params()
-        # conv0_weight = arg['conv0_weight'].asnumpy()
-        # sw.add_histogram(tag="conv0_weight", values=conv0_weight, global_step=mbatch, bins=100)
-        # sw.add_scalar(tag="conv0_weight_max", value=conv0_weight.max(), global_step=mbatch)
-        # sw.add_scalar(tag="conv0_weight_min", value=conv0_weight.min(), global_step=mbatch)
         # logging.info('nbatch %s, epoch %s, step %s acc %s loss %s real_acc %s real_loss %s theta %s',
         #              param.nbatch, param.epoch, global_step[0], acc, loss, real_acc, real_loss, theta.mean())
+        if mbatch % 20 == 0:
+            arg, aux = model.get_params()
+            conv0_weight = arg['conv0_weight'].asnumpy()
+            sw.add_histogram(tag="conv0_weight", values=conv0_weight, global_step=mbatch, bins=100)
+            sw.add_scalar(tag="conv0_weight_max", value=conv0_weight.max(), global_step=mbatch)
+            sw.add_scalar(tag="conv0_weight_min", value=conv0_weight.min(), global_step=mbatch)
 
         _cb(param)
 
