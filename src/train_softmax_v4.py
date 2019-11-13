@@ -35,6 +35,8 @@ from mxboard import SummaryWriter
 
 args = None
 
+DEBUG = False
+
 
 class AccMetric(mx.metric.EvalMetric):
     def __init__(self, real=False):
@@ -128,7 +130,7 @@ class ExtraLossMetric(mx.metric.EvalMetric):
         # 4real t
         # 5 extra loss
         self.count += 1
-        cur_loss = preds[-1].sum().asnumpy()
+        cur_loss = preds[4].sum().asnumpy()
         self.sum_metric += cur_loss
 
         label = labels[0]
@@ -198,8 +200,8 @@ def parse_args():
     parser.add_argument('--rec', default='glint_maysa_0.5_10_300.rec', help='training set directory')
 
     parser.add_argument('--lr', type=float, default=0.05, help='start learning rate')
-    parser.add_argument('--target', type=str, default='lfw', help='verification targets')
-    parser.add_argument('--per-batch-size', type=int, default=48, help='batch size in each context')
+    parser.add_argument('--target', type=str, default='', help='verification targets')
+    parser.add_argument('--per-batch-size', type=int, default=16, help='batch size in each context')
 
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
@@ -506,7 +508,26 @@ def get_symbol(args, arg_params, aux_params):
         out_list.append(mx.symbol.BlockGrad(ce_loss))
     extra_loss_val = -mx.sym.sum(mx.sym.log(origin_softmax_fc7), axis=-1) / args.num_classes
     # 5 extra loss
-    out_list.append(mx.sym.make_loss(0.2 * extra_loss * extra_loss_val, name="extra_loss"))
+    out_list.append(mx.sym.make_loss(0.05 * extra_loss * extra_loss_val, name="extra_loss"))
+    if DEBUG:
+        # 67
+        out_list.append(mx.symbol.BlockGrad(cos_t))
+        out_list.append(mx.symbol.BlockGrad(cal_cos_t))
+        out_list.append(mx.symbol.BlockGrad(mx.sym.mean(nembedding, -1)))
+        out_list.append(mx.symbol.BlockGrad(mx.sym.mean(embedding, -1)))
+        out_list.append(mx.symbol.BlockGrad(mx.sym.mean(_weight, -1)))
+        data = embedding.get_internals()["data"]
+        pre_fc1 = embedding.get_internals()["pre_fc1_output"]
+        stage2_unit4_bn3 = embedding.get_internals()["stage2_unit4_bn3_output"]
+        stage1_unit3_bn3 = embedding.get_internals()["stage1_unit3_bn3_output"]
+        bn0 = embedding.get_internals()["bn0_output"]
+        conv0 = embedding.get_internals()["conv0_output"]
+        out_list.append(mx.symbol.BlockGrad(mx.sym.mean(data, axis=(1, 2, 3))))
+        out_list.append(mx.symbol.BlockGrad(mx.sym.mean(pre_fc1, axis=1)))
+        out_list.append(mx.symbol.BlockGrad(mx.sym.mean(stage2_unit4_bn3, axis=(1, 2, 3))))
+        out_list.append(mx.symbol.BlockGrad(mx.sym.mean(stage1_unit3_bn3, axis=(1, 2, 3))))
+        out_list.append(mx.symbol.BlockGrad(mx.sym.mean(bn0, axis=(1, 2, 3))))
+        out_list.append(mx.symbol.BlockGrad(mx.sym.mean(conv0, axis=(1, 2, 3))))
     out = mx.symbol.Group(out_list)
     #
     return (out, arg_params, aux_params)
@@ -591,7 +612,11 @@ def train_net(args):
         vec = args.pretrained.split(',')
         logging.info('loading %s', vec)
         sym, arg_params, aux_params = mx.model.load_checkpoint(vec[0], int(vec[1]))
-        arg_params['fc7_weight'] = arg_params['fc7_weight'][-args.num_classes:, :]
+        if "fc7_weight" in arg_params:
+            arg_params['fc7_weight'] = arg_params['fc7_weight'][-args.num_classes:, :]
+
+        # conv0_weight = arg_params['conv0_weight'].mean(axis=(1, 2, 3))
+        # logging.info("conv0_weight %s", conv0_weight)
         sym, arg_params, aux_params = get_symbol(args, arg_params, aux_params)
 
     # label_name = 'softmax_label'
@@ -687,6 +712,26 @@ def train_net(args):
         sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
         sw.add_scalar(tag='real_acc', value=real_acc, global_step=mbatch)
         sw.add_scalar(tag='real_loss', value=real_loss, global_step=mbatch)
+        if DEBUG:
+            origin_softmax = model.get_outputs()[2].asnumpy().sum(axis=-1)
+            extra_loss = model.get_outputs()[4].asnumpy()
+            cos1 = model.get_outputs()[5].asnumpy()
+            cos2 = model.get_outputs()[6].asnumpy()
+            embedding_mean = model.get_outputs()[7].asnumpy()
+            embedding_mean1 = model.get_outputs()[8].asnumpy()
+            weight_mean = model.get_outputs()[9].asnumpy()
+            data_mean = model.get_outputs()[10].asnumpy()
+            pre_fc1 = model.get_outputs()[11].asnumpy()
+            stage2_unit4_bn3 = model.get_outputs()[12].asnumpy()
+            stage1_unit3_bn3 = model.get_outputs()[13].asnumpy()
+            bn0 = model.get_outputs()[14].asnumpy()
+            conv0 = model.get_outputs()[15].asnumpy()
+            arg, aux = model.get_params()
+            conv0_weight = arg['conv0_weight'].mean(axis=(1, 2, 3))
+            logging.info(
+                "cos1 %s cos2 %s embedding_mean %s embedding_mean1 %s weight_mean %s data_mean %s pre_fc1 %s stage2_unit4_bn3 %s stage1_unit3_bn3 %s bn0 %s conv0 %s conv0_weight %s, origin_softmax %s extra_loss %s",
+                cos1, cos2, embedding_mean, embedding_mean1, weight_mean, data_mean, pre_fc1, stage2_unit4_bn3, stage1_unit3_bn3, bn0, conv0, conv0_weight, origin_softmax,
+                extra_loss)
         theta = model.get_outputs()[3].asnumpy()
         # logging.info("theta %s", theta)
         sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
