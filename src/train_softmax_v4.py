@@ -201,7 +201,7 @@ def parse_args():
 
     parser.add_argument('--lr', type=float, default=0.05, help='start learning rate')
     parser.add_argument('--target', type=str, default='', help='verification targets')
-    parser.add_argument('--per-batch-size', type=int, default=16, help='batch size in each context')
+    parser.add_argument('--per-batch-size', type=int, default=48, help='batch size in each context')
 
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
