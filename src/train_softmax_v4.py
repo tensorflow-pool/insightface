@@ -703,8 +703,8 @@ def train_net(args):
                 break
 
         acc = param.eval_metric.get_name_value()[0][1]
-        loss = param.eval_metric.get_name_value()[1][1]
-        real_acc = param.eval_metric.get_name_value()[2][1]
+        real_acc = param.eval_metric.get_name_value()[1][1]
+        loss = param.eval_metric.get_name_value()[2][1]
         real_loss = param.eval_metric.get_name_value()[3][1]
         if mbatch % 100 == 0:
             logging.info('lr-batch-epoch: lr %s, nbatch %s, epoch %s, step %s', opt.lr, param.nbatch, param.epoch, global_step[0])
