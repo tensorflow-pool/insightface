@@ -114,7 +114,7 @@ class LossMetric(mx.metric.EvalMetric):
         loss = -mx.ndarray.broadcast_mul(one_hot, softmax_val.log()).sum().asnumpy()
         self.sum_metric += loss
         self.num_inst += len(indexes)
-        logging.info("loss real %s count %s loss %s", self.real, len(indexes), loss)
+        # logging.info("loss real %s count %s loss %s", self.real, len(indexes), loss)
 
 
 class ExtraLossMetric(mx.metric.EvalMetric):
@@ -134,9 +134,9 @@ class ExtraLossMetric(mx.metric.EvalMetric):
         self.sum_metric += cur_loss
 
         label = labels[0]
-        cout = mx.ndarray.where(label, mx.nd.zeros_like(label), mx.nd.ones_like(label)).sum().asnumpy()
-        self.num_inst += cout
-        # logging.info("loss cout %s ExtraLossMetric %s", cout, cur_loss)
+        count = mx.ndarray.where(label, mx.nd.zeros_like(label), mx.nd.ones_like(label)).sum().asnumpy()
+        self.num_inst += count
+        logging.info("loss cout %s", count)
 
 
 class ThetaMetric(mx.metric.EvalMetric):

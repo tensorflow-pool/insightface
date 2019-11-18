@@ -126,6 +126,7 @@ class FaceImageIter(io.DataIter):
                     label = header.label
                     if not isinstance(label, numbers.Number):
                         label = label[0]
+                    # logger.info("idx %s label %s", idx, label)
                     return label, img, None, None
                 else:
                     label, fname, bbox, landmark = self.imglist[idx]
