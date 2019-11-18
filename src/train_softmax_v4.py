@@ -757,7 +757,7 @@ def train_net(args):
 
         _cb(param)
 
-        if mbatch % epoch_size == 0:
+        if mbatch % 650 == 0:
             if len(ver_list) > 0:
                 acc_list = ver_test(mbatch)
                 logging.info('[%d]Accuracy-Highest: %s' % (mbatch, acc_list))
