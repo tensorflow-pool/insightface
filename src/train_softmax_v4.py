@@ -114,7 +114,7 @@ class LossMetric(mx.metric.EvalMetric):
         loss = -mx.ndarray.broadcast_mul(one_hot, softmax_val.log()).sum().asnumpy()
         self.sum_metric += loss
         self.num_inst += len(indexes)
-        # logging.info("loss real %s count %s loss %s", self.real, count, loss)
+        logging.info("loss real %s count %s loss %s", self.real, len(indexes), loss)
 
 
 class ExtraLossMetric(mx.metric.EvalMetric):
