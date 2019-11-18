@@ -136,7 +136,7 @@ class ExtraLossMetric(mx.metric.EvalMetric):
         label = labels[0]
         count = mx.ndarray.where(label, mx.nd.zeros_like(label), mx.nd.ones_like(label)).sum().asnumpy()
         self.num_inst += count
-        # logging.info("loss cout %s", count)
+        logging.info("loss cout %s", count)
 
 
 class ThetaMetric(mx.metric.EvalMetric):
@@ -510,7 +510,7 @@ def get_symbol(args, arg_params, aux_params):
         out_list.append(mx.symbol.BlockGrad(ce_loss))
     extra_loss_val = -mx.sym.sum(mx.sym.log(origin_softmax_fc7), axis=-1) / args.num_classes
     # 5 extra loss
-    out_list.append(mx.sym.make_loss(0.1 * extra_loss * extra_loss_val, name="extra_loss"))
+    out_list.append(mx.sym.make_loss(0.0 * extra_loss * extra_loss_val, name="extra_loss"))
     if DEBUG:
         # 67
         out_list.append(mx.symbol.BlockGrad(cos_t))
