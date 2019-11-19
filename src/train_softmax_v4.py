@@ -136,7 +136,7 @@ class ExtraLossMetric(mx.metric.EvalMetric):
         label = labels[0]
         count = mx.ndarray.where(label, mx.nd.zeros_like(label), mx.nd.ones_like(label)).sum().asnumpy()
         self.num_inst += count
-        logging.info("loss cout %s", count)
+        # logging.info("loss cout %s", count)
 
 
 class ThetaMetric(mx.metric.EvalMetric):
@@ -199,9 +199,9 @@ def parse_args():
     parser.add_argument('--data-dir', default='~/datasets/maysa', help='training set directory')
     parser.add_argument('--rec', default='glint_maysa_0.5_10_300.rec', help='training set directory')
 
-    parser.add_argument('--lr', type=float, default=0.001, help='start learning rate')
-    parser.add_argument('--target', type=str, default='', help='verification targets')
-    parser.add_argument('--per-batch-size', type=int, default=16, help='batch size in each context')
+    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
+    parser.add_argument('--target', type=str, default='lfw', help='verification targets')
+    parser.add_argument('--per-batch-size', type=int, default=48, help='batch size in each context')
 
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
@@ -209,8 +209,7 @@ def parse_args():
     # parser.add_argument('--pretrained', default='../models/model-r34-7-19/model,172000', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='~/models/r100-iccv/model,1', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='~/models/models_retina100_2019-10-18/model,486201', help='pretrained model to load')
-    # parser.add_argument('--pretrained', default='./train/models_2019-11-13-19:20:45/model,434000', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='./train/models_2019-11-18-18:45:00/model,650', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='./train/models_2019-11-13-19:20:45/model,434000', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='', help='pretrained model to load')
     parser.add_argument('--loss-type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
     parser.add_argument('--max-steps', type=int, default=0, help='max training batches')
@@ -482,11 +481,14 @@ def get_symbol(args, arg_params, aux_params):
     out_list = [mx.symbol.BlockGrad(embedding)]
     softmax = mx.symbol.SoftmaxOutput(data=fc7, label=gt_label, name='softmax', normalization='valid')
     base_loss_expanded = mx.sym.expand_dims(base_loss, -1)
-    base_loss_val = mx.sym.make_loss(mx.sym.broadcast_mul(base_loss_expanded, softmax), name="base_loss")
+    base_loss_val = mx.sym.MakeLoss(mx.sym.broadcast_mul(base_loss_expanded, softmax), name="base_loss")
     # 2loss
     out_list.append(base_loss_val)
     # 3real loss
-    origin_softmax_fc7 = mx.symbol.softmax(origin_fc7)
+    # origin_softmax_fc7 = mx.symbol.softmax(origin_fc7)
+    origin_softmax_fc7 = mx.symbol.exp(origin_fc7)
+    origin_softmax_fc7 = mx.sym.broadcast_div(origin_softmax_fc7, mx.symbol.sum(origin_softmax_fc7, axis=-1, keepdims=1))
+    origin_softmax_fc7 = mx.sym.clip(origin_softmax_fc7, a_min=1.18e-38, a_max=3.4e38)
     out_list.append(mx.symbol.BlockGrad(mx.sym.broadcast_mul(base_loss_expanded, origin_softmax_fc7)))
     # out_list.append(mx.symbol.BlockGrad(mx.symbol.softmax(fc7)))
     # origin_softmax_fc7 = mx.symbol.softmax(origin_fc7)
@@ -511,7 +513,7 @@ def get_symbol(args, arg_params, aux_params):
         out_list.append(mx.symbol.BlockGrad(ce_loss))
     extra_loss_val = -mx.sym.sum(mx.sym.log(origin_softmax_fc7), axis=-1) / args.num_classes
     # 5 extra loss
-    out_list.append(mx.sym.make_loss(0.0 * extra_loss * extra_loss_val, name="extra_loss"))
+    out_list.append(mx.sym.MakeLoss(extra_loss * extra_loss_val, name="extra_loss", grad_scale=0.1))
     if DEBUG:
         # 67
         out_list.append(mx.symbol.BlockGrad(cos_t))
@@ -646,7 +648,7 @@ def train_net(args):
     # initializer = mx.init.Xavier(rnd_type='gaussian', factor_type="out", magnitude=2) #resnet style
     _rescale = 1.0 / args.ctx_num / args.batch_size
     opt = optimizer.SGD(learning_rate=base_lr, momentum=base_mom, wd=base_wd, rescale_grad=_rescale)
-    som = 1
+    som = 20
     _cb = mx.callback.Speedometer(args.batch_size, som, auto_reset=True)
 
     ver_list = []
@@ -679,7 +681,6 @@ def train_net(args):
     if len(args.lr_steps) == 0:
         lr_steps = [8, 12, 16]
         lr_steps = [3, 5]
-        lr_steps = [2,4]
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         p = train_dataiter.num_samples() / args.batch_size
@@ -758,7 +759,7 @@ def train_net(args):
 
         _cb(param)
 
-        if mbatch % 650 == 0:
+        if mbatch % epoch_size == 0:
             if len(ver_list) > 0:
                 acc_list = ver_test(mbatch)
                 logging.info('[%d]Accuracy-Highest: %s' % (mbatch, acc_list))
