@@ -778,7 +778,7 @@ def train_net(args):
             arg, aux = model.get_params()
             conv0_weight = arg['conv0_weight'].asnumpy()
             conv0_weight_grad = model._exec_group.grad_arrays[0][0].asnumpy()
-            logging.info("conv0_weight %s %s conv0_weight_grad %s %s", conv0_weight.max(), conv0_weight.min(), conv0_weight_grad.max(), conv0_weight_grad.min())
+            # logging.info("conv0_weight %s %s conv0_weight_grad %s %s", conv0_weight.max(), conv0_weight.min(), conv0_weight_grad.max(), conv0_weight_grad.min())
 
             sw.add_histogram(tag="conv0_weight", values=conv0_weight, global_step=mbatch, bins=100)
             sw.add_scalar(tag="conv0_weight_max", value=conv0_weight.max(), global_step=mbatch)
