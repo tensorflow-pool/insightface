@@ -35,6 +35,7 @@ from mxboard import SummaryWriter
 
 args = None
 
+DEBUG_SOFTMAX = False
 DEBUG = False
 
 
@@ -479,9 +480,8 @@ def get_symbol(args, arg_params, aux_params):
             fc7 = fc7 + body
     # 1embedding
     out_list = [mx.symbol.BlockGrad(embedding)]
-    softmax = mx.symbol.SoftmaxOutput(data=fc7, label=gt_label, name='softmax', normalization='valid')
-    base_loss_expanded = mx.sym.expand_dims(base_loss, -1)
-    base_loss_val = mx.sym.MakeLoss(mx.sym.broadcast_mul(base_loss_expanded, softmax), name="base_loss")
+    softmax = mx.symbol.SoftmaxOutput(data=fc7, label=gt_label, name='softmax', normalization='valid', use_ignore=True, ignore_label=-1)
+    base_loss_val = mx.sym.MakeLoss(softmax, name="base_loss")
     # 2loss
     out_list.append(base_loss_val)
     # 3real loss
@@ -489,7 +489,7 @@ def get_symbol(args, arg_params, aux_params):
     origin_softmax_fc7 = mx.symbol.exp(origin_fc7)
     origin_softmax_fc7 = mx.sym.broadcast_div(origin_softmax_fc7, mx.symbol.sum(origin_softmax_fc7, axis=-1, keepdims=1))
     origin_softmax_fc7 = mx.sym.clip(origin_softmax_fc7, a_min=1.18e-38, a_max=3.4e38)
-    out_list.append(mx.symbol.BlockGrad(mx.sym.broadcast_mul(base_loss_expanded, origin_softmax_fc7)))
+    out_list.append(mx.symbol.BlockGrad(origin_softmax_fc7))
     # out_list.append(mx.symbol.BlockGrad(mx.symbol.softmax(fc7)))
     # origin_softmax_fc7 = mx.symbol.softmax(origin_fc7)
     # out_list.append(mx.symbol.BlockGrad(origin_softmax_fc7))
@@ -514,6 +514,10 @@ def get_symbol(args, arg_params, aux_params):
     extra_loss_val = -mx.sym.sum(mx.sym.log(origin_softmax_fc7), axis=-1) / args.num_classes
     # 5 extra loss
     out_list.append(mx.sym.MakeLoss(extra_loss * extra_loss_val, name="extra_loss", grad_scale=0.1))
+    if DEBUG_SOFTMAX:
+        out_list.append(mx.symbol.BlockGrad(base_loss))
+        out_list.append(mx.symbol.BlockGrad(extra_loss))
+        out_list.append(mx.symbol.BlockGrad(origin_fc7))
     if DEBUG:
         # 67
         out_list.append(mx.symbol.BlockGrad(cos_t))
@@ -718,6 +722,37 @@ def train_net(args):
         sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
         sw.add_scalar(tag='real_acc', value=real_acc, global_step=mbatch)
         sw.add_scalar(tag='real_loss', value=real_loss, global_step=mbatch)
+
+        if DEBUG_SOFTMAX:
+            base_lose = model.get_outputs()[5].asnumpy().astype(np.int32)
+            base_lose_indexes = []
+            for index, l in enumerate(base_lose):
+                if l == 1:
+                    base_lose_indexes.append(index)
+            extra_loss = model.get_outputs()[6].asnumpy().astype(np.int32)
+            extra_loss_indexes = []
+            for index, l in enumerate(extra_loss):
+                if l == 1:
+                    extra_loss_indexes.append(index)
+            origin_fc7 = model.get_outputs()[7].asnumpy().astype(np.int32)
+            # logging.info("origin_fc7 %s %s", origin_fc7.min(axis=1), origin_fc7.max(axis=1))
+            # logging.info("origin_fc7 %s %s", origin_fc7.min(), origin_fc7.max())
+            # logging.info("origin_fc7 %s", origin_fc7)
+
+            softmax = model.get_outputs()[1].asnumpy()[base_lose_indexes]
+            real_softmax = model.get_outputs()[2].asnumpy()[base_lose_indexes]
+            extra_softmax = model.get_outputs()[2].asnumpy()[extra_loss_indexes]
+            # logging.info("base_lose %s extra_loss %s", base_lose, extra_loss)
+            logging.info("softmax %s %s real_softmax %s %s extra_softmax %s %s",
+                         softmax.min(axis=1), softmax.max(axis=1), real_softmax.min(axis=1), real_softmax.max(axis=1), extra_softmax.min(axis=1), extra_softmax.max(axis=1))
+
+            # logging.info("softmax %s %s", softmax.min(axis=1), softmax.max(axis=1))
+            # logging.info("softmax sum%s", softmax.sum(axis=1))
+
+            # logging.info("real_softmax %s %s", real_softmax.min(axis=1), real_softmax.max(axis=1))
+            # logging.info("real_softmax sum %s", real_softmax.sum(axis=1))
+
+            # logging.info("extra_softmax %s %s", extra_softmax.min(axis=1), extra_softmax.max(axis=1))
         if DEBUG:
             origin_softmax = model.get_outputs()[2].asnumpy().sum(axis=-1)
             extra_loss = model.get_outputs()[4].asnumpy()
@@ -738,6 +773,7 @@ def train_net(args):
                 "cos1 %s cos2 %s embedding_mean %s embedding_mean1 %s weight_mean %s data_mean %s pre_fc1 %s stage2_unit4_bn3 %s stage1_unit3_bn3 %s bn0 %s conv0 %s conv0_weight %s, origin_softmax %s extra_loss %s",
                 cos1, cos2, embedding_mean, embedding_mean1, weight_mean, data_mean, pre_fc1, stage2_unit4_bn3, stage1_unit3_bn3, bn0, conv0, conv0_weight, origin_softmax,
                 extra_loss)
+
         if mbatch % 20 == 0:
             arg, aux = model.get_params()
             conv0_weight = arg['conv0_weight'].asnumpy()
@@ -751,11 +787,43 @@ def train_net(args):
             sw.add_scalar(tag="conv0_weight_grad_max", value=conv0_weight_grad.max(), global_step=mbatch)
             sw.add_scalar(tag="conv0_weight_grad_min", value=conv0_weight_grad.min(), global_step=mbatch)
 
-        theta = model.get_outputs()[3].asnumpy()
-        # logging.info("theta %s", theta)
-        sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
-        # logging.info('nbatch %s, epoch %s, step %s acc %s loss %s real_acc %s real_loss %s theta %s',
-        #              param.nbatch, param.epoch, global_step[0], acc, loss, real_acc, real_loss, theta.mean())
+            theta = model.get_outputs()[3].asnumpy()
+            # logging.info("theta %s", theta)
+            sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
+            # logging.info('nbatch %s, epoch %s, step %s acc %s loss %s real_acc %s real_loss %s theta %s',
+            #              param.nbatch, param.epoch, global_step[0], acc, loss, real_acc, real_loss, theta.mean())
+
+            label = param.locals['data_batch'].label[0]
+            base_lose_indexes = []
+            for index, l in enumerate(label):
+                if l != 0:
+                    base_lose_indexes.append(index)
+            extra_loss_indexes = []
+            for index, l in enumerate(label):
+                if l == 0:
+                    extra_loss_indexes.append(index)
+            softmax = model.get_outputs()[1].asnumpy()[base_lose_indexes]
+            real_softmax = model.get_outputs()[2].asnumpy()[base_lose_indexes]
+            extra_softmax = model.get_outputs()[2].asnumpy()[extra_loss_indexes]
+            # logging.info("softmax %s %s real_softmax %s %s extra_softmax %s %s",
+            #              softmax.min(axis=1), softmax.max(axis=1), real_softmax.min(axis=1), real_softmax.max(axis=1), extra_softmax.min(axis=1), extra_softmax.max(axis=1))
+
+            if len(base_lose_indexes) > 0:
+                # sw.add_histogram(tag="softmax_min", values=softmax.min(axis=1), global_step=mbatch, bins=100)
+                # sw.add_histogram(tag="softmax_max", values=softmax.max(axis=1), global_step=mbatch, bins=100)
+                # sw.add_histogram(tag="softmax", values=softmax, global_step=mbatch, bins=100)
+
+                sw.add_histogram(tag="real_softmax_min", values=real_softmax.min(axis=1), global_step=mbatch, bins=100)
+                sw.add_histogram(tag="real_softmax_max", values=real_softmax.max(axis=1), global_step=mbatch, bins=100)
+                sw.add_histogram(tag="real_softmax", values=real_softmax, global_step=mbatch, bins=100)
+
+            if len(extra_loss_indexes) > 0:
+                sw.add_histogram(tag="extra_softmax_min", values=extra_softmax.min(axis=1), global_step=mbatch, bins=100)
+                sw.add_histogram(tag="extra_softmax_max", values=extra_softmax.max(axis=1), global_step=mbatch, bins=100)
+                sw.add_histogram(tag="extra_softmax", values=extra_softmax, global_step=mbatch, bins=100)
+
+            # logging.info("real_softmax_min %s real_softmax_max %s extra_softmax_min %s extra_softmax_max %s",
+            #              real_softmax.min(axis=1), real_softmax.max(axis=1), extra_softmax.min(axis=1), extra_softmax.max(axis=1))
 
         _cb(param)
 
