@@ -200,7 +200,7 @@ def parse_args():
     parser.add_argument('--data-dir', default='~/datasets/maysa', help='training set directory')
     parser.add_argument('--rec', default='glint_maysa_0.5_10_300.rec', help='training set directory')
 
-    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
+    parser.add_argument('--lr', type=float, default=0.001, help='start learning rate')
     parser.add_argument('--target', type=str, default='lfw', help='verification targets')
     parser.add_argument('--per-batch-size', type=int, default=48, help='batch size in each context')
 
@@ -211,6 +211,7 @@ def parse_args():
     # parser.add_argument('--pretrained', default='~/models/r100-iccv/model,1', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='~/models/models_retina100_2019-10-18/model,486201', help='pretrained model to load')
     parser.add_argument('--pretrained', default='./train/models_2019-11-13-19:20:45/model,434000', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='./train/models_2019-11-20-18:56:29/model,263700', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='', help='pretrained model to load')
     parser.add_argument('--loss-type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
     parser.add_argument('--max-steps', type=int, default=0, help='max training batches')
@@ -684,7 +685,7 @@ def train_net(args):
     global_step = [0]
     if len(args.lr_steps) == 0:
         lr_steps = [8, 12, 16]
-        lr_steps = [3, 5]
+        lr_steps = [2]
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         p = train_dataiter.num_samples() / args.batch_size
@@ -694,7 +695,10 @@ def train_net(args):
         for l in range(len(lr_steps)):
             # lr_steps[l] = int(lr_steps[l])
             lr_steps[l] = int(lr_steps[l] * p)
-        args.max_steps = 2 * lr_steps[-1] - lr_steps[-2]
+        if len(lr_steps) == 1:
+            args.max_steps = 2 * lr_steps[-1]
+        else:
+            args.max_steps = 2 * lr_steps[-1] - lr_steps[-2]
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
     epoch_size = int(train_dataiter.num_samples() / args.batch_size)
