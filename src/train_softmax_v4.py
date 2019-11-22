@@ -210,7 +210,7 @@ def parse_args():
     # parser.add_argument('--pretrained', default='../models/model-r34-7-19/model,172000', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='~/models/r100-iccv/model,1', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='~/models/models_retina100_2019-10-18/model,486201', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='./train/models_2019-11-13-19:20:45/model,434000', help='pretrained model to load')
+    # parser.add_argument('--pretrained', default='./train/models_2019-11-13-19:20:45/model,434000', help='pretrained model to load')
     parser.add_argument('--pretrained', default='./train/models_2019-11-20-18:56:29/model,263700', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='', help='pretrained model to load')
     parser.add_argument('--loss-type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
