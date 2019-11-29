@@ -129,7 +129,7 @@ def parse_args():
     parser.add_argument('--data-dir', default='~/datasets/maysa', help='training set directory')
     parser.add_argument('--rec', default='maysa_0.5_10_300.rec', help='training set directory')
 
-    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
+    parser.add_argument('--lr', type=float, default=0.001, help='start learning rate')
     parser.add_argument('--target', type=str, default='lfw', help='verification targets')
     parser.add_argument('--per-batch-size', type=int, default=48, help='batch size in each context')
 
@@ -404,7 +404,7 @@ def get_symbol(args, arg_params, aux_params):
             body = mx.sym.broadcast_mul(gt_one_hot, diff)
             fc7 = fc7 + body
     out_list = [mx.symbol.BlockGrad(embedding)]
-    softmax = mx.symbol.SoftmaxOutput(data=fc7, label=gt_label, name='softmax', normalization='valid')
+    softmax = mx.symbol.SoftmaxOutput(data=fc7, label=gt_label, name='softmax', normalization='null')
     out_list.append(softmax)
     out_list.append(mx.symbol.BlockGrad(mx.symbol.softmax(origin_fc7)))
     out_list.append(mx.symbol.BlockGrad(origin_t))
@@ -563,7 +563,7 @@ def train_net(args):
     global_step = [0]
     if len(args.lr_steps) == 0:
         lr_steps = [8, 12, 16]
-        lr_steps = [4, 6]
+        lr_steps = [3, 5]
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         p = train_dataiter.num_samples() / args.batch_size
