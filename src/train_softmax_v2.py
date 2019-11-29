@@ -455,7 +455,7 @@ def train_net(args):
     logging.info('num_layers %s', args.num_layers)
     if args.per_batch_size == 0:
         args.per_batch_size = 128
-    args.batch_size = args.per_batch_size * args.ctx_num
+    args.batch_size = args.ctx_num
     args.rescale_threshold = 0
     args.image_channel = 3
 
@@ -529,7 +529,7 @@ def train_net(args):
     else:
         initializer = mx.init.Xavier(rnd_type='uniform', factor_type="in", magnitude=2)
     # initializer = mx.init.Xavier(rnd_type='gaussian', factor_type="out", magnitude=2) #resnet style
-    _rescale = args.batch_size / args.ctx_num
+    _rescale = 1 / args.ctx_num
     opt = optimizer.SGD(learning_rate=base_lr, momentum=base_mom, wd=base_wd, rescale_grad=_rescale)
     som = 20
     _cb = mx.callback.Speedometer(args.batch_size, som, auto_reset=True)
