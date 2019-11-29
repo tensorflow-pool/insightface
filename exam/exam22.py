@@ -64,11 +64,12 @@ print("------------------------------")
 
 
 print("------------------------------")
-x = nd.ones((4, 2)) * 2
-x[0, 0] = 4
+batch_size = 4
+x = nd.ones((batch_size, 2)) * 2
+# x[0, 0] = 4
 x.attach_grad()
 with autograd.record():
-    t = nd.SoftmaxOutput(x, nd.array([1, 1, 1, 2]), normalization='valid', use_ignore=True, ignore_label=2)
+    t = nd.SoftmaxOutput(x, nd.array([1] * batch_size), normalization='valid', use_ignore=True, ignore_label=2)
     # t1 = nd.exp(x)
     # # print("t1", t1)
     # # t1.attach_grad()
