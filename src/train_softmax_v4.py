@@ -877,7 +877,7 @@ def train_net(args):
               batch_end_callback=_batch_callback,
               epoch_end_callback=epoch_cb)
 
-
+# 增加了爱奇艺的损失函数
 def main():
     import gluoncv
     gluoncv.utils.random.seed(1)

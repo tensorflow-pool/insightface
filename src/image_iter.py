@@ -9,6 +9,7 @@ import random
 import sys
 from io import BytesIO
 
+import cv2
 import mxnet as mx
 import numpy as np
 from PIL import Image
@@ -28,6 +29,7 @@ class FaceImageIter(io.DataIter):
                  shuffle=False, aug_list=None, mean=None,
                  rand_mirror=False, cutoff=0, color_jittering=0,
                  images_filter=0,
+                 gauss=0,
                  data_name='data', label_name='softmax_label', **kwargs):
         super(FaceImageIter, self).__init__()
         assert path_imgrec
@@ -84,6 +86,7 @@ class FaceImageIter(io.DataIter):
         self.batch_size = batch_size
         self.data_shape = data_shape
         self.shuffle = shuffle
+        self.gauss = gauss
         self.image_size = '%d,%d' % (data_shape[1], data_shape[2])
         self.rand_mirror = rand_mirror
         print('rand_mirror', rand_mirror)
@@ -207,6 +210,11 @@ class FaceImageIter(io.DataIter):
                 _data = self.imdecode(s)
                 if _data.shape[0] != self.data_shape[1]:
                     _data = mx.image.resize_short(_data, self.data_shape[1])
+                if self.gauss:
+                    _rd = random.randint(0, 1)
+                    if _rd == 1:
+                        _data = cv2.GaussianBlur(_data.asnumpy(), (5, 5), 5)
+                        _data = mx.ndarray.array(_data)
                 if self.rand_mirror:
                     _rd = random.randint(0, 1)
                     if _rd == 1:

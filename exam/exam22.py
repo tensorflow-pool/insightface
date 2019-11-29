@@ -62,27 +62,27 @@ print("------------------------------")
 # print("t1g", t1.grad)
 # print("x", x.grad)
 
-#
-# print("------------------------------")
-# x = nd.ones((4, 3)) * 2
-# x[0, 0] = 4
-# x.attach_grad()
-# with autograd.record():
-#     t = nd.SoftmaxOutput(x, nd.array([1, 1, 1, 2]), normalization='valid', use_ignore=True, ignore_label=2)
-#     # t1 = nd.exp(x)
-#     # # print("t1", t1)
-#     # # t1.attach_grad()
-#     # t2 = nd.broadcast_div(t1, nd.sum(t1, axis=-1, keepdims=True))
-#     # t2 = nd.broadcast_mul(t2, nd.array([1, 1, 1, 0]).expand_dims(axis=1))
-#     # print("t2", t2)
-#     # # t2.attach_grad()
-#     # t = -nd.pick(t2, nd.array([1, 1, 1, 2]), axis=1)
-# print("t", t)
-# t.backward()
-#
-# print("x", x.grad)
-# # print("t1", t1.grad)
-# # print("t2", t2.grad)
+
+print("------------------------------")
+x = nd.ones((4, 2)) * 2
+x[0, 0] = 4
+x.attach_grad()
+with autograd.record():
+    t = nd.SoftmaxOutput(x, nd.array([1, 1, 1, 2]), normalization='valid', use_ignore=True, ignore_label=2)
+    # t1 = nd.exp(x)
+    # # print("t1", t1)
+    # # t1.attach_grad()
+    # t2 = nd.broadcast_div(t1, nd.sum(t1, axis=-1, keepdims=True))
+    # t2 = nd.broadcast_mul(t2, nd.array([1, 1, 1, 0]).expand_dims(axis=1))
+    # print("t2", t2)
+    # # t2.attach_grad()
+    # t = -nd.pick(t2, nd.array([1, 1, 1, 2]), axis=1)
+print("t", t)
+t.backward()
+
+print("x", x.grad)
+# print("t1", t1.grad)
+# print("t2", t2.grad)
 
 
 # print("------------------------------")
@@ -113,30 +113,30 @@ print("------------------------------")
 # # print("t2", t2.grad)
 
 
-print("------------------------------")
-x = nd.ones((4, 3)) * 2
-x[0, 0] = 64
-x[0, 1] = -64
-x[3, 0] = 64
-x[3, 1] = -64
-print("x", x)
-x.attach_grad()
-with autograd.record():
-    # t = nd.SoftmaxOutput(x, nd.array([1, 1, 1, 2]), normalization='valid', use_ignore=False, ignore_label=2)
-    t1 = nd.exp(x)
-    # print("t1", t1)
-    t1.attach_grad()
-    t2 = nd.broadcast_div(t1, nd.sum(t1, axis=-1, keepdims=True))
-    t2 = nd.clip(t2, a_min=1.18e-38, a_max=3.4e38)
-    t2.attach_grad()
-    print("t2", t2)
-    # t2.attach_grad()
-    t = nd.pick(t2, nd.array([1, 1, 1, 2]), axis=1)
-    print("t", t)
-    t = -t.log().sum()
-print("t", t)
-t.backward()
-
-print("x", x.grad)
-print("t1", t1.grad)
-print("t2", t2.grad)
+# print("------------------------------")
+# x = nd.ones((4, 3)) * 2
+# x[0, 0] = 64
+# x[0, 1] = -64
+# x[3, 0] = 64
+# x[3, 1] = -64
+# print("x", x)
+# x.attach_grad()
+# with autograd.record():
+#     # t = nd.SoftmaxOutput(x, nd.array([1, 1, 1, 2]), normalization='valid', use_ignore=False, ignore_label=2)
+#     t1 = nd.exp(x)
+#     # print("t1", t1)
+#     t1.attach_grad()
+#     t2 = nd.broadcast_div(t1, nd.sum(t1, axis=-1, keepdims=True))
+#     t2 = nd.clip(t2, a_min=1.18e-38, a_max=3.4e38)
+#     t2.attach_grad()
+#     print("t2", t2)
+#     # t2.attach_grad()
+#     t = nd.pick(t2, nd.array([1, 1, 1, 2]), axis=1)
+#     print("t", t)
+#     t = -t.log().sum()
+# print("t", t)
+# t.backward()
+#
+# print("x", x.grad)
+# print("t1", t1.grad)
+# print("t2", t2.grad)

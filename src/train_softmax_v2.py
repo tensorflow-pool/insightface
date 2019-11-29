@@ -129,7 +129,7 @@ def parse_args():
     parser.add_argument('--data-dir', default='~/datasets/maysa', help='training set directory')
     parser.add_argument('--rec', default='maysa_0.5_10_300.rec', help='training set directory')
 
-    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
+    parser.add_argument('--lr', type=float, default=0.001, help='start learning rate')
     parser.add_argument('--target', type=str, default='lfw', help='verification targets')
     parser.add_argument('--per-batch-size', type=int, default=48, help='batch size in each context')
 
@@ -138,7 +138,8 @@ def parse_args():
     # parser.add_argument('--pretrained', default='../models/model-r34-amf/model,0', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models/model-r34-7-19/model,172000', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models/r100-iccv/model,1', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='~/models/models_retina100_2019-10-18/model,486201', help='pretrained model to load')
+    # parser.add_argument('--pretrained', default='../models_retina100_2019-10-18/model,486201', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='./train/models_2019-11-06-14:24:12/model,492590', help='pretrained model to load')
     parser.add_argument('--loss-type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
     parser.add_argument('--max-steps', type=int, default=0, help='max training batches')
     parser.add_argument('--end-epoch', type=int, default=100000, help='training epoch size.')
@@ -483,6 +484,7 @@ def train_net(args):
         cutoff=args.cutoff,
         color_jittering=args.color,
         images_filter=args.images_filter,
+        gauss=True
     )
     args.num_classes = train_dataiter.num_class()
     assert (args.num_classes > 0)
@@ -527,7 +529,7 @@ def train_net(args):
     else:
         initializer = mx.init.Xavier(rnd_type='uniform', factor_type="in", magnitude=2)
     # initializer = mx.init.Xavier(rnd_type='gaussian', factor_type="out", magnitude=2) #resnet style
-    _rescale = 1.0 / args.ctx_num
+    _rescale = 1.0 / args.ctx_num / args.batch_size
     opt = optimizer.SGD(learning_rate=base_lr, momentum=base_mom, wd=base_wd, rescale_grad=_rescale)
     som = 20
     _cb = mx.callback.Speedometer(args.batch_size, som, auto_reset=True)
@@ -561,7 +563,7 @@ def train_net(args):
     global_step = [0]
     if len(args.lr_steps) == 0:
         lr_steps = [8, 12, 16]
-        lr_steps = [3, 6, 8]
+        lr_steps = [4, 6]
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         p = train_dataiter.num_samples() / args.batch_size
@@ -571,7 +573,10 @@ def train_net(args):
         for l in range(len(lr_steps)):
             # lr_steps[l] = int(lr_steps[l])
             lr_steps[l] = int(lr_steps[l] * p)
-        args.max_steps = 2 * lr_steps[-1] - lr_steps[-2]
+        if len(lr_steps) == 1:
+            args.max_steps = 2 * lr_steps[-1]
+        else:
+            args.max_steps = 2 * lr_steps[-1] - lr_steps[-2]
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
     epoch_size = int(train_dataiter.num_samples() / args.batch_size)
@@ -599,10 +604,24 @@ def train_net(args):
         sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
         sw.add_scalar(tag='real_acc', value=real_acc, global_step=mbatch)
         sw.add_scalar(tag='real_loss', value=real_loss, global_step=mbatch)
-        theta = model.get_outputs()[3].asnumpy()
-        sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
-        # logging.info('nbatch %s, epoch %s, step %s acc %s loss %s real_acc %s real_loss %s theta %s',
-        #              param.nbatch, param.epoch, global_step[0], acc, loss, real_acc, real_loss, theta.mean())
+
+        if mbatch % 20 == 0:
+            softmax = model.get_outputs()[1].asnumpy()
+            real_softmax = model.get_outputs()[2].asnumpy()
+            theta = model.get_outputs()[3].asnumpy()
+
+            sw.add_histogram(tag="softmax_min", values=softmax.min(axis=1), global_step=mbatch, bins=100)
+            sw.add_histogram(tag="softmax_max", values=softmax.max(axis=1), global_step=mbatch, bins=100)
+            sw.add_histogram(tag="softmax", values=softmax, global_step=mbatch, bins=100)
+
+            sw.add_histogram(tag="real_softmax_min", values=real_softmax.min(axis=1), global_step=mbatch, bins=100)
+            sw.add_histogram(tag="real_softmax_max", values=real_softmax.max(axis=1), global_step=mbatch, bins=100)
+            sw.add_histogram(tag="real_softmax", values=real_softmax, global_step=mbatch, bins=100)
+
+            sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
+
+            # logging.info("base_lose %s extra_loss %s", base_lose, extra_loss)
+            logging.info("softmax %s %s real_softmax %s %s", softmax.min(), softmax.max(), real_softmax.min(), real_softmax.max())
 
         _cb(param)
 
