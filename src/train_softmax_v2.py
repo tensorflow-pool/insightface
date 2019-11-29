@@ -484,7 +484,7 @@ def train_net(args):
         cutoff=args.cutoff,
         color_jittering=args.color,
         images_filter=args.images_filter,
-        gauss=False
+        gauss=True
     )
     args.num_classes = train_dataiter.num_class()
     assert (args.num_classes > 0)
