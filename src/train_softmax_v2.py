@@ -129,7 +129,7 @@ def parse_args():
     parser.add_argument('--data-dir', default='~/datasets/maysa', help='training set directory')
     parser.add_argument('--rec', default='maysa_0.5_10_300.rec', help='training set directory')
 
-    parser.add_argument('--lr', type=float, default=0.0001, help='start learning rate')
+    parser.add_argument('--lr', type=float, default=0.001, help='start learning rate')
     parser.add_argument('--target', type=str, default='lfw', help='verification targets')
     parser.add_argument('--per-batch-size', type=int, default=48, help='batch size in each context')
 
@@ -455,7 +455,7 @@ def train_net(args):
     logging.info('num_layers %s', args.num_layers)
     if args.per_batch_size == 0:
         args.per_batch_size = 128
-    args.batch_size = args.ctx_num
+    args.batch_size = args.per_batch_size * args.ctx_num
     args.rescale_threshold = 0
     args.image_channel = 3
 
@@ -484,7 +484,7 @@ def train_net(args):
         cutoff=args.cutoff,
         color_jittering=args.color,
         images_filter=args.images_filter,
-        gauss=True
+        gauss=False
     )
     args.num_classes = train_dataiter.num_class()
     assert (args.num_classes > 0)
@@ -529,7 +529,7 @@ def train_net(args):
     else:
         initializer = mx.init.Xavier(rnd_type='uniform', factor_type="in", magnitude=2)
     # initializer = mx.init.Xavier(rnd_type='gaussian', factor_type="out", magnitude=2) #resnet style
-    _rescale = 1 / args.ctx_num
+    _rescale = 1.0 / args.ctx_num
     opt = optimizer.SGD(learning_rate=base_lr, momentum=base_mom, wd=base_wd, rescale_grad=_rescale)
     som = 20
     _cb = mx.callback.Speedometer(args.batch_size, som, auto_reset=True)
