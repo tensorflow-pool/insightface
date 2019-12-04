@@ -70,7 +70,11 @@ class FaceDataset(mx.gluon.data.Dataset):
             self.pic_ids = new_pic_ids
             self.labels = new_labels
             self.label2pic = new_label2pic
+
         self.order_labels = sorted(self.label2pic.keys())
+        self.train_labels = {}
+        for index, label in enumerate(self.order_labels):
+            self.train_labels[label] = index
         logger.info("final pic_ids %s labels %s", len(self.pic_ids), len(self.label2pic))
 
     def is_deleted(self, label):
@@ -116,7 +120,7 @@ class FaceDataset(mx.gluon.data.Dataset):
                 pic_id = str(pic_id).encode('utf-8')
                 data = self.pic_db.Get(pic_id)
                 img = mx.image.imdecode(data)
-                return img, label, pic_id
+                return img, self.train_labels[label], pic_id
             except Exception as e:
                 logger.info("pic_id %s no pic", pic_id)
         else:
