@@ -106,6 +106,8 @@ class FaceDataset(mx.gluon.data.Dataset):
         if os.path.exists(leveldb_feature_path):
             fea_db = leveldb.LevelDB(leveldb_feature_path, max_open_files=100)
             for batch_index, label in enumerate(self.order_labels):
+                if batch_index % 1000 == 0:
+                    logger.info("label_features batch_index/count %s/%s", batch_index, self.label_len)
                 pic_id = self.label2pic[label][0]
                 try:
                     pic_id = str(pic_id).encode('utf-8')
