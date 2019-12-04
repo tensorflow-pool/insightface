@@ -491,7 +491,7 @@ def train_net(args):
         vec = args.pretrained.split(',')
         logging.info('loading %s', vec)
         sym, arg_params, aux_params = mx.model.load_checkpoint(vec[0], int(vec[1]))
-        logging.info("fc7_weight norm %s", mx.nd.norm(arg_params['fc7_weight'], axis=1)[:20])
+        logging.info("fc7_weight norm %s", mx.nd.norm(arg_params['fc7_weight'], axis=1).mean())
         del arg_params['fc7_weight']
         arg_params['fc7_weight'] = dataset.label_features(os.path.expanduser("~/datasets/cacher/features"))
         sym, arg_params, aux_params = get_symbol(args, arg_params, aux_params)

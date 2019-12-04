@@ -112,7 +112,7 @@ class FaceDataset(mx.gluon.data.Dataset):
                 try:
                     pic_id = str(pic_id).encode('utf-8')
                     data = fea_db.Get(pic_id)
-                    ret_features[batch_index][:] = np.frombuffer(data, dtype=np.float32)[:512]
+                    ret_features[batch_index][:] = np.frombuffer(data, dtype=np.float32)[:512] * 0.3
                 except Exception as e:
                     logger.info("pic_id %s no pic", pic_id)
         return ret_features
