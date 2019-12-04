@@ -6,12 +6,11 @@ from __future__ import print_function
 import argparse
 import logging
 import math
-import os
-import sys
-
 import mxnet as mx
 import mxnet.optimizer as optimizer
 import numpy as np
+import os
+import sys
 
 from image_dataset import FaceImageIter, FaceDataset
 
@@ -493,7 +492,7 @@ def train_net(args):
         logging.info('loading %s', vec)
         sym, arg_params, aux_params = mx.model.load_checkpoint(vec[0], int(vec[1]))
         del arg_params['fc7_weight']
-        # arg_params['fc7_weight'] = arg_params['fc7_weight'][-args.num_classes:, :]
+        arg_params['fc7_weight'] = dataset.label_features(os.path.expanduser("~/datasets/cacher/features"))
         sym, arg_params, aux_params = get_symbol(args, arg_params, aux_params)
 
     # label_name = 'softmax_label'

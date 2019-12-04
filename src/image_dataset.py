@@ -3,14 +3,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import cv2
 import leveldb
 import logging
+import mxnet as mx
+import numpy as np
 import os
 import random
 from collections import defaultdict
-
-import cv2
-import mxnet as mx
 from mxnet import io, nd
 
 logger = logging.getLogger()
@@ -101,6 +101,20 @@ class FaceDataset(mx.gluon.data.Dataset):
             return self.labels[index]
         return -1
 
+    def label_features(self, leveldb_feature_path):
+        ret_features = nd.empty((self.label_len, 512))
+        if os.path.exists(leveldb_feature):
+            fea_db = leveldb.LevelDB(leveldb_feature_path, max_open_files=100)
+            for batch_index, label in enumerate(self.order_labels):
+                pic_id = self.label2pic[label][0]
+                try:
+                    pic_id = str(pic_id).encode('utf-8')
+                    data = fea_db.Get(pic_id)
+                    ret_features[batch_index][:] = np.frombuffer(data, dtype=np.float32)[:512]
+                except Exception as e:
+                    logger.info("pic_id %s no pic", pic_id)
+        return ret_features
+
     @property
     def pic_len(self):
         return len(self.pic_ids)
@@ -138,7 +152,6 @@ class FaceDataset(mx.gluon.data.Dataset):
 
 
 class FaceImageIter(io.DataIter):
-
     def __init__(self, batch_size, data_shape, dataset, shuffle=False, gauss=0, data_name='data', label_name='softmax_label'):
         super(FaceImageIter, self).__init__()
         self.check_data_shape(data_shape)
