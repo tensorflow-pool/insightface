@@ -116,13 +116,13 @@ def parse_args():
 
     leveldb_path = os.path.expanduser("~/datasets/cacher/pictures")
     parser.add_argument('--leveldb_path', default=leveldb_path, help='training set directory')
-    label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.01_10")
+    label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.38")
     parser.add_argument('--label_path', default=label_path, help='training set directory')
     target = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.38")
     parser.add_argument('--target', type=str, default="", help='verification targets')
 
     parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
-    parser.add_argument('--per-batch-size', type=int, default=48, help='batch size in each context')
+    parser.add_argument('--per-batch-size', type=int, default=16, help='batch size in each context')
 
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
@@ -463,7 +463,7 @@ def train_net(args):
         args.gamma = 0.06
 
     data_shape = (args.image_channel, image_size[0], image_size[1])
-    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=10, max_images=50, ignore_labels={0})
+    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=3100, max_images=300, ignore_labels={0})
     train_dataiter = FaceImageIter(
         batch_size=args.batch_size,
         data_shape=data_shape,
@@ -562,13 +562,14 @@ def train_net(args):
             # lr_steps[l] = int(lr_steps[l])
             lr_steps[l] = int(lr_steps[l] * p)
         if len(lr_steps) == 1:
-            args.max_steps = 2 * lr_steps[-1]
+            args.max_steps = 2 * lr_steps[-1] + 1000
         else:
-            args.max_steps = 2 * lr_steps[-1] - lr_steps[-2]
+            args.max_steps = 2 * lr_steps[-1] - lr_steps[-2] + 1000
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
     epoch_size = int(train_dataiter.num_samples() / args.batch_size)
     logging.info('lr_steps %s epoch_size %s', lr_steps, epoch_size)
+    start_time = time.time()
 
     def _batch_callback(param):
         # global global_step
@@ -585,7 +586,11 @@ def train_net(args):
         real_acc = param.eval_metric.get_name_value()[2][1]
         real_loss = param.eval_metric.get_name_value()[3][1]
         if mbatch % 100 == 0:
-            logging.info('lr-batch-epoch: lr %s, nbatch %s, epoch %s, step %s', opt.lr, param.nbatch, param.epoch, global_step[0])
+            spend = (time.time() - start_time) / 3600
+            speed = spend / global_step[0]
+            left = (args.max_steps - global_step[0]) * speed
+            logging.info('lr-batch-epoch: lr %s, nbatch %s, epoch %s, step %s spend/left %.02f/%.02f',
+                         opt.lr, param.nbatch, param.epoch, global_step[0], spend, left)
 
         sw.add_scalar(tag='lr', value=opt.lr, global_step=mbatch)
         sw.add_scalar(tag='acc', value=acc, global_step=mbatch)
