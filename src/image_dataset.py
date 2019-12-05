@@ -3,14 +3,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import cv2
 import leveldb
 import logging
-import mxnet as mx
-import numpy as np
 import os
 import random
 from collections import defaultdict
+
+import cv2
+import mxnet as mx
+import numpy as np
 from mxnet import io, nd
 
 logger = logging.getLogger()
@@ -26,11 +27,13 @@ class FaceDataset(mx.gluon.data.Dataset):
         self.leveldb_path = leveldb_path
         self.label_path = label_path
         self.path_imgidx_filter = label_path + ".filter"
+        self.path_label_check = label_path + ".check"
         self.filter_labels = set()
         if os.path.exists(self.path_imgidx_filter):
             filtered_labels = open(self.path_imgidx_filter).readlines()
             self.filter_labels = [int(l) for l in filtered_labels]
             self.filter_labels = set(self.filter_labels)
+            # logger.info("FaceDataset filter_labels %s", self.filter_labels)
 
         if leveldb_path in self.pic_db_dict:
             self.pic_db = self.pic_db_dict[leveldb_path]
@@ -71,7 +74,6 @@ class FaceDataset(mx.gluon.data.Dataset):
             self.pic_ids = new_pic_ids
             self.labels = new_labels
             self.label2pic = new_label2pic
-
         self.order_labels = sorted(self.label2pic.keys())
         self.train_labels = {}
         for index, label in enumerate(self.order_labels):
@@ -88,19 +90,119 @@ class FaceDataset(mx.gluon.data.Dataset):
                 file.write(str(l))
                 file.write("\n")
 
-    def before_next_label(self, label):
-        if label in self.order_labels:
-            index = self.order_labels.index(label)
-            last = 0 if index == 0 else index - 1
-            next = index + 1 if index < len(self.order_labels) - 1 else index
-            return self.order_labels[last], self.order_labels[next]
-        return 0, 0
+    def check_labels(self, random_select, fea_db):
+        label2score = {}
+        for batch_index, label in enumerate(self.order_labels):
+            pic_ids = self.label2pic[label]
+            pic_ids = random.sample(pic_ids, min(len(pic_ids), random_select))
 
-    def label_by_pic_id(self, pic_id):
-        if pic_id in self.pic_ids:
-            index = self.pic_ids.index(pic_id)
-            return self.labels[index]
-        return -1
+            ret_features = nd.empty((len(pic_ids), 512))
+            for pic_id_index, pic_id in enumerate(pic_ids):
+                try:
+                    pic_id = str(pic_id).encode('utf-8')
+                    data = fea_db.Get(pic_id)
+                    ret_features[pic_id_index][:] = np.frombuffer(data, dtype=np.float32)[:512]
+                except Exception as e:
+                    logger.info("pic_id %s no features", pic_id)
+            scores = nd.dot(ret_features, ret_features.T)
+            mean = (nd.sum(scores) - len(scores)) / (len(scores) * len(scores) - len(scores))
+            mean = mean.asscalar()
+            label2score[label] = mean
+            if batch_index % 10 == 0:
+                logger.info("mean %s batch_index/count %s/%s", mean, batch_index, self.label_len)
+        return label2score
+
+    def mean_pic_ids(self, random_select, fea_db):
+        while True:
+            label = self.task_queue.get()
+            if label is None:
+                break
+            pic_ids = self.label2pic[label]
+            pic_ids = random.sample(pic_ids, min(len(pic_ids), random_select))
+
+            ret_features = nd.empty((len(pic_ids), 512))
+            for pic_id_index, pic_id in enumerate(pic_ids):
+                try:
+                    pic_id = str(pic_id).encode('utf-8')
+                    data = fea_db.Get(pic_id)
+                    ret_features[pic_id_index][:] = np.frombuffer(data, dtype=np.float32)[:512]
+                except Exception as e:
+                    logger.info("pic_id %s no features", pic_id)
+            scores = nd.dot(ret_features, ret_features.T)
+            mean = (nd.sum(scores) - len(scores)) / (len(scores) * len(scores) - len(scores))
+            # logger.info("result_queue %s", label)
+            self.result_queue.put([label, mean.asscalar()])
+        with self.thread_lock:
+            self.activated -= 1
+            logger.info("thread end %s", self.activated)
+        if self.activated <= 0:
+            self.result_queue.put(None)
+
+    def check_labels_by_thread(self, random_select, fea_db, thread_count=6):
+        self.task_queue = Queue(len(self.order_labels))
+        self.result_queue = Queue(len(self.order_labels))
+        self.thread_lock = threading.Lock()
+        self.activated = thread_count
+        for _ in range(thread_count):
+            t = threading.Thread(target=self.mean_pic_ids, args=(random_select, fea_db))
+            t.start()
+
+        for label in self.order_labels:
+            self.task_queue.put(label)
+        for _ in range(thread_count):
+            self.task_queue.put(None)
+        label2score = {}
+        process_count = 0
+        while True:
+            result = self.result_queue.get()
+            if result is None:
+                break
+            process_count += 1
+            if process_count % 100 == 0:
+                logger.info("process_count %s", process_count)
+            label, mean = result
+            label2score[label] = mean
+        return label2score
+
+    def check_warning_labels(self, leveldb_feature_path, th=None, random_select=100):
+        if not os.path.exists(self.path_label_check):
+            if os.path.exists(leveldb_feature_path):
+                fea_db = leveldb.LevelDB(leveldb_feature_path, max_open_files=100)
+                # label2score = self.check_labels(random_select, fea_db)
+                label2score = self.check_labels_by_thread(random_select, fea_db)
+
+            sections = [0.4, 0.5, 0.6, 0.7, 1]
+            counts = [0] * len(sections)
+            for k in label2score:
+                mean = label2score[k]
+                for index, count in enumerate(sections):
+                    if mean < count:
+                        counts[index] += 1
+                        break
+            per_counts = [c / len(label2score) for c in counts]
+            logger.info("sections %s counts %s per_counts %s", sections, counts, per_counts)
+
+            with open(self.path_label_check, "w") as file:
+                items = list(label2score.items())
+                items = sorted(items, key=lambda x: x[1])
+                for k, v in items:
+                    file.write(str(k) + "," + str(v))
+                    file.write("\n")
+
+        label2score = {}
+        with open(self.path_label_check, "r") as file:
+            items = file.readlines()
+            for line in items:
+                label, score_mean = line.strip().split(",")
+                label = int(label)
+                if th is None:
+                    if float(score_mean) < 0.6 and label in self.label2pic:
+                        label2score[label] = float(score_mean)
+                else:
+                    if float(score_mean) < th and label in self.label2pic:
+                        self.delete_label(label)
+                        label2score[label] = float(score_mean)
+        return label2score
 
     def label_features(self, leveldb_feature_path):
         ret_features = nd.empty((self.label_len, 512))
@@ -117,6 +219,20 @@ class FaceDataset(mx.gluon.data.Dataset):
                 except Exception as e:
                     logger.info("pic_id %s no pic", pic_id)
         return ret_features
+
+    def before_next_label(self, label):
+        if label in self.order_labels:
+            index = self.order_labels.index(label)
+            last = 0 if index == 0 else index - 1
+            next = index + 1 if index < len(self.order_labels) - 1 else index
+            return self.order_labels[last], self.order_labels[next]
+        return 0, 0
+
+    def label_by_pic_id(self, pic_id):
+        if pic_id in self.pic_ids:
+            index = self.pic_ids.index(pic_id)
+            return self.labels[index]
+        return -1
 
     @property
     def pic_len(self):
