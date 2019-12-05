@@ -3,13 +3,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import leveldb
 import logging
 import os
 import random
 from collections import defaultdict
 
 import cv2
+import leveldb
 import mxnet as mx
 import numpy as np
 from mxnet import io, nd
@@ -42,38 +42,42 @@ class FaceDataset(mx.gluon.data.Dataset):
             self.pic_db_dict[leveldb_path] = self.pic_db
         with open(self.label_path, "r") as file:
             lines = file.readlines()
-            self.pic_ids = []
-            self.labels = []
-            self.label2pic = defaultdict(list)
+            self.base_pic_ids = []
+            self.base_labels = []
+            self.base_label2pic = defaultdict(list)
             for index, line in enumerate(lines):
                 pic_id, label = line.strip().split(",")
                 label = int(label)
                 if label == -1 or label in ignore_labels or label in self.filter_labels:
                     continue
-                self.pic_ids.append(pic_id)
-                self.labels.append(label)
-                self.label2pic[label].append(pic_id)
-        logger.info("origin pic_ids %s labels %s", len(self.pic_ids), len(self.label2pic))
+                self.base_pic_ids.append(pic_id)
+                self.base_labels.append(label)
+                self.base_label2pic[label].append(pic_id)
+        self.min_images = min_images
+        self.max_images = max_images
+        self.reset()
+
+    def reset(self):
+        logger.info("origin pic_ids %s labels %s", len(self.base_pic_ids), len(self.base_label2pic))
+        min_images = self.min_images
+        max_images = self.max_images
         if min_images > 0:
-            ignore_pic_ids = set()
             new_label2pic = defaultdict(list)
-            for l in self.label2pic:
-                c = self.label2pic[l]
+            for l in self.base_label2pic:
+                c = self.base_label2pic[l]
                 if len(c) >= min_images:
-                    new_label2pic[l] = c[:max_images]
-                    for ig in c[max_images:]:
-                        ignore_pic_ids.add(ig)
+                    sub = random.sample(c, min(max_images, len(c)))
+                    new_label2pic[l] = sub
             new_pic_ids = []
             new_labels = []
-            for index in range(len(self.labels)):
-                label = self.labels[index]
+            for label in new_label2pic:
                 if label in new_label2pic:
-                    if self.pic_ids[index] not in ignore_pic_ids:
-                        new_pic_ids.append(self.pic_ids[index])
-                        new_labels.append(self.labels[index])
+                    new_pic_ids += new_label2pic[label]
+                    new_labels += [label] * len(new_label2pic[label])
             self.pic_ids = new_pic_ids
             self.labels = new_labels
             self.label2pic = new_label2pic
+
         self.order_labels = sorted(self.label2pic.keys())
         self.train_labels = {}
         for index, label in enumerate(self.order_labels):
@@ -292,6 +296,7 @@ class FaceImageIter(io.DataIter):
     def reset(self):
         """Resets the iterator to the beginning of the data."""
         print('call reset()')
+        self.dataset.reset()
         self.cur = 0
         if self.shuffle:
             random.shuffle(self.seq)
