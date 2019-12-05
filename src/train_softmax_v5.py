@@ -463,7 +463,7 @@ def train_net(args):
         args.gamma = 0.06
 
     data_shape = (args.image_channel, image_size[0], image_size[1])
-    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=3100, max_images=300, ignore_labels={0})
+    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=100, max_images=300, ignore_labels={0})
     train_dataiter = FaceImageIter(
         batch_size=args.batch_size,
         data_shape=data_shape,
@@ -491,7 +491,7 @@ def train_net(args):
         vec = args.pretrained.split(',')
         logging.info('loading %s', vec)
         sym, arg_params, aux_params = mx.model.load_checkpoint(vec[0], int(vec[1]))
-        logging.info("fc7_weight norm %s", mx.nd.norm(arg_params['fc7_weight'], axis=1)[:20])
+        logging.info("fc7_weight norm %s", mx.nd.norm(arg_params['fc7_weight'], axis=1).mean())
         del arg_params['fc7_weight']
         arg_params['fc7_weight'] = dataset.label_features(os.path.expanduser("~/datasets/cacher/features"))
         sym, arg_params, aux_params = get_symbol(args, arg_params, aux_params)

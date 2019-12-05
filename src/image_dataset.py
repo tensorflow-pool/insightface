@@ -45,10 +45,11 @@ class FaceDataset(mx.gluon.data.Dataset):
             for index, line in enumerate(lines):
                 pic_id, label = line.strip().split(",")
                 label = int(label)
-                if label != -1 or label in ignore_labels or label in self.filter_labels:
-                    self.pic_ids.append(pic_id)
-                    self.labels.append(label)
-                    self.label2pic[label].append(pic_id)
+                if label == -1 or label in ignore_labels or label in self.filter_labels:
+                    continue
+                self.pic_ids.append(pic_id)
+                self.labels.append(label)
+                self.label2pic[label].append(pic_id)
         logger.info("origin pic_ids %s labels %s", len(self.pic_ids), len(self.label2pic))
         if min_images > 0:
             ignore_pic_ids = set()
@@ -112,7 +113,7 @@ class FaceDataset(mx.gluon.data.Dataset):
                 try:
                     pic_id = str(pic_id).encode('utf-8')
                     data = fea_db.Get(pic_id)
-                    ret_features[batch_index][:] = np.frombuffer(data, dtype=np.float32)[:512]
+                    ret_features[batch_index][:] = np.frombuffer(data, dtype=np.float32)[:512] * 0.3
                 except Exception as e:
                     logger.info("pic_id %s no pic", pic_id)
         return ret_features
