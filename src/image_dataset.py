@@ -77,6 +77,10 @@ class FaceDataset(mx.gluon.data.Dataset):
             self.pic_ids = new_pic_ids
             self.labels = new_labels
             self.label2pic = new_label2pic
+        else:
+            self.pic_ids = self.base_pic_ids
+            self.labels = self.base_labels
+            self.label2pic = self.base_label2pic
 
         self.order_labels = sorted(self.label2pic.keys())
         self.train_labels = {}
@@ -381,16 +385,24 @@ class FaceImageIter(io.DataIter):
 
 if __name__ == '__main__':
     from PIL import Image
-
+    random.seed(100)
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(thread)d %(filename)s[line:%(lineno)d] %(levelname)s %(message)s')
 
     leveldb_path = os.path.expanduser("~/datasets/cacher/pictures")
     label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.38")
 
-    dataset = FaceDataset(leveldb_path, label_path, min_images=0)
+    dataset = FaceDataset(leveldb_path, label_path, min_images=10, max_images=10)
     print(len(dataset))
+
     face = dataset[1100][0].asnumpy()
     im = Image.fromarray(face)
     if not os.path.exists("output"):
         os.mkdir("output")
-    im.save("output/tmp.jpg", quality=95)
+    im.save("output/tmp1.jpg", quality=95)
+
+    dataset.reset()
+    face = dataset[1100][0].asnumpy()
+    im = Image.fromarray(face)
+    if not os.path.exists("output"):
+        os.mkdir("output")
+    im.save("output/tmp2.jpg", quality=95)
