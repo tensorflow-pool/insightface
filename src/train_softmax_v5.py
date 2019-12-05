@@ -116,13 +116,13 @@ def parse_args():
 
     leveldb_path = os.path.expanduser("~/datasets/cacher/pictures")
     parser.add_argument('--leveldb_path', default=leveldb_path, help='training set directory')
-    label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.38")
+    label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.01_10")
     parser.add_argument('--label_path', default=label_path, help='training set directory')
     target = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.38")
     parser.add_argument('--target', type=str, default="", help='verification targets')
 
     parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
-    parser.add_argument('--per-batch-size', type=int, default=16, help='batch size in each context')
+    parser.add_argument('--per-batch-size', type=int, default=48, help='batch size in each context')
 
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
@@ -463,7 +463,7 @@ def train_net(args):
         args.gamma = 0.06
 
     data_shape = (args.image_channel, image_size[0], image_size[1])
-    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=100, max_images=300, ignore_labels={0})
+    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=10, max_images=50, ignore_labels={0})
     train_dataiter = FaceImageIter(
         batch_size=args.batch_size,
         data_shape=data_shape,
