@@ -130,7 +130,8 @@ def parse_args():
     # parser.add_argument('--pretrained', default='../models/model-r34-7-19/model,172000', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models/r100-iccv/model,1', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models_retina100_2019-10-18/model,486201', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='./train/models_2019-11-06-14:24:12/model,492590', help='pretrained model to load')
+    # parser.add_argument('--pretrained', default='./train/models_2019-11-06-14:24:12/model,492590', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='./train/models_2019-12-05-21:08:10/model,70060', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='', help='pretrained model to load')
     parser.add_argument('--loss-type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
     parser.add_argument('--max-steps', type=int, default=0, help='max training batches')
@@ -463,7 +464,7 @@ def train_net(args):
         args.gamma = 0.06
 
     data_shape = (args.image_channel, image_size[0], image_size[1])
-    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=3100, max_images=300, ignore_labels={0})
+    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=10, max_images=10, ignore_labels={0})
     train_dataiter = FaceImageIter(
         batch_size=args.batch_size,
         data_shape=data_shape,
@@ -492,8 +493,8 @@ def train_net(args):
         logging.info('loading %s', vec)
         sym, arg_params, aux_params = mx.model.load_checkpoint(vec[0], int(vec[1]))
         logging.info("fc7_weight norm %s", mx.nd.norm(arg_params['fc7_weight'], axis=1).mean())
-        del arg_params['fc7_weight']
-        arg_params['fc7_weight'] = dataset.label_features(os.path.expanduser("~/datasets/cacher/features"))
+        # del arg_params['fc7_weight']
+        # arg_params['fc7_weight'] = dataset.label_features(os.path.expanduser("~/datasets/cacher/features"))
         sym, arg_params, aux_params = get_symbol(args, arg_params, aux_params)
 
     # label_name = 'softmax_label'
@@ -551,7 +552,7 @@ def train_net(args):
     global_step = [0]
     if len(args.lr_steps) == 0:
         lr_steps = [8, 12, 16]
-        lr_steps = [5, 8]
+        lr_steps = [1, 5, 7]
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         p = train_dataiter.num_samples() / args.batch_size
