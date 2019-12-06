@@ -116,10 +116,10 @@ def parse_args():
 
     leveldb_path = os.path.expanduser("~/datasets/cacher/pictures")
     parser.add_argument('--leveldb_path', default=leveldb_path, help='training set directory')
-    label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.38")
+    label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.01_10")
     parser.add_argument('--label_path', default=label_path, help='training set directory')
-    target = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.38")
-    parser.add_argument('--target', type=str, default="", help='verification targets')
+    target = os.path.expanduser("~/datasets/maysa/lfw.bin")
+    parser.add_argument('--target', type=str, default=target, help='verification targets')
 
     parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
     parser.add_argument('--per-batch-size', type=int, default=16, help='batch size in each context')
