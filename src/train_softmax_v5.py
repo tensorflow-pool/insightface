@@ -591,7 +591,7 @@ def train_net(args):
             spend = (time.time() - start_time) / 3600
             speed = spend / global_step[0]
             left = (args.max_steps - global_step[0]) * speed
-            logging.info('-------->>>>>lr-batch-epoch: lr %s, nbatch/epoch_size %s/epoch_size,  epoch %s, step %s spend/left %.02f/%.02f',
+            logging.info('=================>lr-batch-epoch: lr %s, nbatch/epoch_size %s/%s,  epoch %s, step %s spend/left %.02f/%.02f',
                          opt.lr, param.nbatch, epoch_size, param.epoch, global_step[0], spend, left)
 
         sw.add_scalar(tag='lr', value=opt.lr, global_step=mbatch)
