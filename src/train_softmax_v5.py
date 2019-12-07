@@ -117,11 +117,14 @@ def parse_args():
 
     leveldb_path = os.path.expanduser("~/datasets/cacher/pictures")
     parser.add_argument('--leveldb_path', default=leveldb_path, help='training set directory')
-    label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.01_10")
+    # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.05_30")
+    # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.38_39")
+    label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.35/pictures.labels.35.33_34")
     parser.add_argument('--label_path', default=label_path, help='training set directory')
     target = os.path.expanduser("~/datasets/maysa/lfw.bin")
     parser.add_argument('--target', type=str, default=target, help='verification targets')
 
+    parser.add_argument('--load_weight', type=int, default=0, help='重新加载feature')
     parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
     parser.add_argument('--per-batch-size', type=int, default=48, help='batch size in each context')
 
@@ -132,7 +135,8 @@ def parse_args():
     # parser.add_argument('--pretrained', default='../models/r100-iccv/model,1', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models_retina100_2019-10-18/model,486201', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/models_2019-11-06-14:24:12/model,492590', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='./train/models_2019-12-05-21:08:10/model,70060', help='pretrained model to load')
+    # parser.add_argument('--pretrained', default='./train/models_2019-12-05-21:08:10/model,70060', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='./train/models_2019-12-06-09:51:21/model,231021', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='', help='pretrained model to load')
     parser.add_argument('--loss-type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
     parser.add_argument('--max-steps', type=int, default=0, help='max training batches')
@@ -494,8 +498,9 @@ def train_net(args):
         logging.info('loading %s', vec)
         sym, arg_params, aux_params = mx.model.load_checkpoint(vec[0], int(vec[1]))
         logging.info("fc7_weight norm %s", mx.nd.norm(arg_params['fc7_weight'], axis=1).mean())
+        if args.load_weight:
+            arg_params['fc7_weight'] = dataset.label_features(os.path.expanduser("~/datasets/cacher/features"))
         # del arg_params['fc7_weight']
-        # arg_params['fc7_weight'] = dataset.label_features(os.path.expanduser("~/datasets/cacher/features"))
         sym, arg_params, aux_params = get_symbol(args, arg_params, aux_params)
 
     # label_name = 'softmax_label'
@@ -551,11 +556,13 @@ def train_net(args):
     # for i in range(len(ver_list)):
     #  highest_acc.append(0.0)
     global_step = [0]
+
+    base_lr_steps = [8, 12, 16]
+    base_lr_steps = [4, 6, 8]
     if len(args.lr_steps) == 0:
-        lr_steps = [8, 12, 16]
-        lr_steps = [1, 5, 7]
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
+        lr_steps = base_lr_steps
         p = train_dataiter.num_samples() / args.batch_size
         # 加速
         # if p > 20000:
@@ -647,7 +654,15 @@ def train_net(args):
             sys.exit(0)
 
     def epoch_cb(epoch, symbol, arg, aux):
-        pass
+        # 11-12w人
+        # 10 100w
+        # 50 310-350w
+        # 100 500w
+        if epoch == base_lr_steps[-2]:
+            dataset.max_images = 50
+        if epoch == base_lr_steps[-1]:
+            dataset.max_images = 300
+
 
     train_dataiter = mx.io.PrefetchingIter(train_dataiter)
 
