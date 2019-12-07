@@ -469,13 +469,13 @@ def train_net(args):
         args.gamma = 0.06
 
     data_shape = (args.image_channel, image_size[0], image_size[1])
-    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=1000, max_images=10, ignore_labels={0})
+    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=10, max_images=10, ignore_labels={0})
     train_dataiter = FaceImageIter(
         batch_size=args.batch_size,
         data_shape=data_shape,
         dataset=dataset,
         shuffle=True,
-        gauss=True
+        gauss=False
     )
     args.num_classes = train_dataiter.num_class()
     assert (args.num_classes > 0)
