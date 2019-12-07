@@ -558,7 +558,7 @@ def train_net(args):
     global_step = [0]
 
     base_lr_steps = [8, 12, 16]
-    base_lr_steps = [4, 6, 8]
+    base_lr_steps = [1, 2, 8]
     if len(args.lr_steps) == 0:
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
@@ -576,7 +576,7 @@ def train_net(args):
             args.max_steps = 2 * lr_steps[-1] - lr_steps[-2] + 120
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
-    epoch_size = int(train_dataiter.num_samples() / args.batch_size)
+    epoch_size = int(dataset.pic_len / args.batch_size)
     logging.info('lr_steps %s epoch_size %s', lr_steps, epoch_size)
     start_time = time.time()
 
@@ -662,7 +662,7 @@ def train_net(args):
         if epoch == base_lr_steps[-2]:
             dataset.max_images = 50
             dataset.reset()
-            p = train_dataiter.num_samples() / args.batch_size
+            p = dataset.pic_len / args.batch_size
             lr_steps[-2] = int(base_lr_steps[-2] * p)
             lr_steps[-1] = int(base_lr_steps[-1] * p)
             if len(lr_steps) == 1:
@@ -673,7 +673,7 @@ def train_net(args):
         if epoch == base_lr_steps[-1]:
             dataset.max_images = 300
             dataset.reset()
-            p = train_dataiter.num_samples() / args.batch_size
+            p = dataset.pic_len / args.batch_size
             lr_steps[-1] = int(base_lr_steps[-1] * p)
             if len(lr_steps) == 1:
                 args.max_steps = 2 * lr_steps[-1] + 120
