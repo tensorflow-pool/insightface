@@ -571,9 +571,9 @@ def train_net(args):
             # lr_steps[l] = int(lr_steps[l])
             lr_steps[l] = int(lr_steps[l] * p)
         if len(lr_steps) == 1:
-            args.max_steps = 2 * lr_steps[-1] + 1000
+            args.max_steps = 2 * lr_steps[-1] + 120
         else:
-            args.max_steps = 2 * lr_steps[-1] - lr_steps[-2] + 1000
+            args.max_steps = 2 * lr_steps[-1] - lr_steps[-2] + 120
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
     epoch_size = int(train_dataiter.num_samples() / args.batch_size)
@@ -658,7 +658,7 @@ def train_net(args):
         # 10 100w
         # 50 310-350w
         # 100 500w
-            logging.info("================>epoch_cb epoch %s g_step %s", epoch, global_step[0])
+        logging.info("================>epoch_cb epoch %s g_step %s", epoch, global_step[0])
         if epoch == base_lr_steps[-2]:
             logging.info("================>change max_images to 50 epoch %s g_step %s", epoch, global_step[0])
             dataset.max_images = 50
