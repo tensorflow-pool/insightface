@@ -469,7 +469,7 @@ def train_net(args):
         args.gamma = 0.06
 
     data_shape = (args.image_channel, image_size[0], image_size[1])
-    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=10, max_images=10, ignore_labels={0})
+    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=3000, max_images=10, ignore_labels={0})
     train_dataiter = FaceImageIter(
         batch_size=args.batch_size,
         data_shape=data_shape,
@@ -659,8 +659,10 @@ def train_net(args):
         # 50 310-350w
         # 100 500w
         if epoch == base_lr_steps[-2]:
+            logging.info("================>change max_images to 50 epoch %s g_step %s", epoch, global_step[0])
             dataset.max_images = 50
         if epoch == base_lr_steps[-1]:
+            logging.info("================>change max_images to 300 epoch %s g_step %s", epoch, global_step[0])
             dataset.max_images = 300
 
 
