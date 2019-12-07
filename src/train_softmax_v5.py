@@ -658,7 +658,7 @@ def train_net(args):
         # 10 100w
         # 50 310-350w
         # 100 500w
-        logging.info("================>epoch_cb epoch %s g_step %s", epoch, global_step[0])
+        logging.info("================>epoch_cb epoch %s g_step %s base_lr_steps %s", epoch, global_step[0], base_lr_steps)
         if epoch == base_lr_steps[-2]:
             logging.info("================>change max_images to 50 epoch %s g_step %s", epoch, global_step[0])
             dataset.max_images = 50
