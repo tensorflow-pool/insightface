@@ -562,7 +562,7 @@ def train_net(args):
     if len(args.lr_steps) == 0:
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
-        lr_steps = base_lr_steps
+        lr_steps = base_lr_steps.copy()
         p = train_dataiter.num_samples() / args.batch_size
         # 加速
         # if p > 20000:
