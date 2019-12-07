@@ -469,7 +469,7 @@ def train_net(args):
         args.gamma = 0.06
 
     data_shape = (args.image_channel, image_size[0], image_size[1])
-    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=1000, max_images=10, ignore_labels={0})
+    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=10, max_images=10, ignore_labels={0})
     train_dataiter = FaceImageIter(
         batch_size=args.batch_size,
         data_shape=data_shape,
@@ -558,7 +558,7 @@ def train_net(args):
     global_step = [0]
 
     base_lr_steps = [8, 12, 16]
-    base_lr_steps = [1, 2, 8]
+    base_lr_steps = [4, 6, 8]
     if len(args.lr_steps) == 0:
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
