@@ -469,7 +469,7 @@ def train_net(args):
         args.gamma = 0.06
 
     data_shape = (args.image_channel, image_size[0], image_size[1])
-    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=10, max_images=10, ignore_labels={0})
+    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=1000, max_images=10, ignore_labels={0})
     train_dataiter = FaceImageIter(
         batch_size=args.batch_size,
         data_shape=data_shape,
@@ -627,22 +627,6 @@ def train_net(args):
 
         _cb(param)
 
-        if mbatch % epoch_size == 0:
-            if len(ver_list) > 0:
-                acc_list = ver_test(mbatch)
-                logging.info('[%d]Accuracy-Highest: %s' % (mbatch, acc_list))
-                sw.add_scalar(tag='val', value=acc_list[0], global_step=global_step[0])
-
-            logging.info('saving %s', mbatch)
-            arg, aux = model.get_params()
-            new_arg = {}
-            for k in arg:
-                if k == "fc7_weight":
-                    continue
-                new_arg[k] = arg[k]
-            new_arg = arg
-            mx.model.save_checkpoint(prefix + "/model", mbatch, model.symbol[0].get_children(), new_arg, aux)
-
         if mbatch <= args.beta_freeze:
             _beta = args.beta
         else:
@@ -654,6 +638,22 @@ def train_net(args):
             sys.exit(0)
 
     def epoch_cb(epoch, symbol, arg, aux):
+        mbatch = global_step[0]
+        if len(ver_list) > 0:
+            acc_list = ver_test(mbatch)
+            logging.info('[%d]Accuracy-Highest: %s' % (mbatch, acc_list))
+            sw.add_scalar(tag='val', value=acc_list[0], global_step=global_step[0])
+
+        logging.info('saving %s', mbatch)
+        arg, aux = model.get_params()
+        new_arg = {}
+        for k in arg:
+            if k == "fc7_weight":
+                continue
+            new_arg[k] = arg[k]
+        new_arg = arg
+        mx.model.save_checkpoint(prefix + "/model", mbatch, model.symbol[0].get_children(), new_arg, aux)
+
         # 11-12w人
         # 10 100w
         # 50 310-350w
@@ -662,9 +662,24 @@ def train_net(args):
         if epoch == base_lr_steps[-2]:
             logging.info("================>change max_images to 50 epoch %s g_step %s", epoch, global_step[0])
             dataset.max_images = 50
+            dataset.reset()
+            p = train_dataiter.num_samples() / args.batch_size
+            lr_steps[-2] = int(base_lr_steps[-2] * p)
+            lr_steps[-1] = int(base_lr_steps[-1] * p)
+            if len(lr_steps) == 1:
+                args.max_steps = 2 * lr_steps[-1] + 120
+            else:
+                args.max_steps = 2 * lr_steps[-1] - lr_steps[-2] + 120
         if epoch == base_lr_steps[-1]:
             logging.info("================>change max_images to 300 epoch %s g_step %s", epoch, global_step[0])
             dataset.max_images = 300
+            dataset.reset()
+            p = train_dataiter.num_samples() / args.batch_size
+            lr_steps[-1] = int(base_lr_steps[-1] * p)
+            if len(lr_steps) == 1:
+                args.max_steps = 2 * lr_steps[-1] + 120
+            else:
+                args.max_steps = 2 * lr_steps[-1] - lr_steps[-2] + 120
 
     train_dataiter = mx.io.PrefetchingIter(train_dataiter)
 
