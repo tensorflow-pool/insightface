@@ -127,7 +127,7 @@ def parse_args():
     target = os.path.expanduser("~/datasets/maysa/lfw.bin")
     parser.add_argument('--target', type=str, default=target, help='verification targets')
 
-    parser.add_argument('--load_weight', type=int, default=0, help='重新加载feature')
+    parser.add_argument('--load_weight', type=int, default=1, help='重新加载feature')
     parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
     parser.add_argument('--per_batch_size', type=int, default=48, help='batch size in each context')
 
@@ -568,54 +568,59 @@ def train_net(args):
         end_epoch = 2 * lr_steps[-1]
     else:
         end_epoch = 2 * lr_steps[-1] - lr_steps[-2]
-    epoch_sizes = [dataset.pic_len / args.batch_size] * end_epoch
+    epoch_sizes = [int(dataset.pic_len / args.batch_size)] * end_epoch
     args.max_steps = np.sum(epoch_sizes)
     args.lr_steps = lr_steps
     start_time = time.time()
 
     def _batch_callback(param):
-        mbatch = global_step[0]
-        acc = param.eval_metric.get_name_value()[0][1]
-        loss = param.eval_metric.get_name_value()[1][1]
-        real_acc = param.eval_metric.get_name_value()[2][1]
-        real_loss = param.eval_metric.get_name_value()[3][1]
-        if mbatch % 100 == 0:
-            spend = (time.time() - start_time) / 3600
-            speed = spend / global_step[0]
-            left = (args.max_steps - global_step[0]) * speed
-            logging.info('=================>lr-batch-epoch: lr %s, nbatch/epoch_size %s/%s,  epoch %s, step %s spend/left %.02f/%.02f',
-                         opt.lr, param.nbatch, int(dataset.pic_len / args.batch_size), param.epoch, global_step[0], spend, left)
+        nbatch = param.nbatch
+        global_batch = global_step[0]
 
-        sw.add_scalar(tag='lr', value=opt.lr, global_step=mbatch)
-        sw.add_scalar(tag='acc', value=acc, global_step=mbatch)
-        sw.add_scalar(tag='loss', value=loss, global_step=mbatch)
-        sw.add_scalar(tag='real_acc', value=real_acc, global_step=mbatch)
-        sw.add_scalar(tag='real_loss', value=real_loss, global_step=mbatch)
+        if nbatch != 0 and nbatch % 20 == 0:
+            acc = param.eval_metric.get_name_value()[0][1]
+            loss = param.eval_metric.get_name_value()[1][1]
+            real_acc = param.eval_metric.get_name_value()[2][1]
+            real_loss = param.eval_metric.get_name_value()[3][1]
 
-        if mbatch % 20 == 0:
+            sw.add_scalar(tag='lr', value=opt.lr, global_step=global_batch)
+            sw.add_scalar(tag='acc', value=acc, global_step=global_batch)
+            sw.add_scalar(tag='loss', value=loss, global_step=global_batch)
+            sw.add_scalar(tag='real_acc', value=real_acc, global_step=global_batch)
+            sw.add_scalar(tag='real_loss', value=real_loss, global_step=global_batch)
+
             softmax = model.get_outputs()[1].asnumpy()
             real_softmax = model.get_outputs()[2].asnumpy()
             theta = model.get_outputs()[3].asnumpy()
 
-            sw.add_histogram(tag="softmax_min", values=softmax.min(axis=1), global_step=mbatch, bins=100)
-            sw.add_histogram(tag="softmax_max", values=softmax.max(axis=1), global_step=mbatch, bins=100)
-            sw.add_histogram(tag="softmax", values=softmax, global_step=mbatch, bins=100)
+            sw.add_histogram(tag="softmax_min", values=softmax.min(axis=1), global_step=global_batch, bins=100)
+            sw.add_histogram(tag="softmax_max", values=softmax.max(axis=1), global_step=global_batch, bins=100)
+            sw.add_histogram(tag="softmax", values=softmax, global_step=global_batch, bins=100)
 
-            sw.add_histogram(tag="real_softmax_min", values=real_softmax.min(axis=1), global_step=mbatch, bins=100)
-            sw.add_histogram(tag="real_softmax_max", values=real_softmax.max(axis=1), global_step=mbatch, bins=100)
-            sw.add_histogram(tag="real_softmax", values=real_softmax, global_step=mbatch, bins=100)
+            sw.add_histogram(tag="real_softmax_min", values=real_softmax.min(axis=1), global_step=global_batch, bins=100)
+            sw.add_histogram(tag="real_softmax_max", values=real_softmax.max(axis=1), global_step=global_batch, bins=100)
+            sw.add_histogram(tag="real_softmax", values=real_softmax, global_step=global_batch, bins=100)
 
-            sw.add_histogram(tag="theta", values=theta, global_step=mbatch, bins=100)
-
-            # logging.info("base_lose %s extra_loss %s", base_lose, extra_loss)
+            sw.add_histogram(tag="theta", values=theta, global_step=global_batch, bins=100)
             logging.info("softmax %s %s real_softmax %s %s", softmax.min(), softmax.max(), real_softmax.min(), real_softmax.max())
+            # logging.info("base_lose %s extra_loss %s", base_lose, extra_loss)
 
+            spend = (time.time() - start_time) / 3600
+            if global_batch == 0:
+                speed = 0
+            else:
+                speed = spend / global_batch
+            left = (args.max_steps - global_step[0]) * speed
+            logging.info('lr-batch-epoch: lr %s, nbatch/epoch_size %s/%s,  epoch %s, step %s spend/left %.02f/%.02f',
+                         opt.lr, param.nbatch, int(dataset.pic_len / args.batch_size), param.epoch, global_step[0], spend, left)
+
+        # speed最后调用
         _cb(param)
 
-        if mbatch <= args.beta_freeze:
+        if global_batch <= args.beta_freeze:
             _beta = args.beta
         else:
-            move = max(0, mbatch - args.beta_freeze)
+            move = max(0, global_batch - args.beta_freeze)
             _beta = max(args.beta_min, args.beta * math.pow(1 + args.gamma * move, -1.0 * args.power))
         # logging.info('beta', _beta)
         os.environ['BETA'] = str(_beta)
@@ -624,7 +629,8 @@ def train_net(args):
 
     def epoch_cb(epoch, symbol, arg, aux):
         logging.info("================>epoch_cb epoch %s g_step %s args.lr_steps %s", epoch, global_step[0], args.lr_steps)
-        for _lr in args.lr_steps:
+        _lr_steps = [step - 1 for step in args.lr_steps]
+        for _lr in _lr_steps:
             if epoch == args.beta_freeze + _lr:
                 opt.lr *= 0.1
                 logging.info('lr change to %s', opt.lr)
@@ -649,14 +655,16 @@ def train_net(args):
         # 10 100w
         # 50 310-350w
         # 100 500w
-        if epoch == args.lr_steps[-2]:
+        # 改变学习率的第一个epoch不变
+        if epoch == _lr_steps[-2] + 1:
             dataset.max_images = 50
-        if epoch == lr_steps[-1]:
+        if epoch == _lr_steps[-1] + 1:
             dataset.max_images = 300
         dataset.reset()
-        for index in range(epoch, end_epoch):
-            epoch_sizes[index] = dataset.pic_len / args.batch_size
-            args.max_steps = np.sum(epoch_sizes)
+        # 下一个epoch才生效
+        for index in range(epoch + 1, end_epoch):
+            epoch_sizes[index] = int(dataset.pic_len / args.batch_size)
+        args.max_steps = np.sum(epoch_sizes)
         logging.info("================>change max_images to %s epoch %s g_step %s max_steps %s epoch_sizes %s ", dataset.max_images, epoch, global_step[0], epoch_sizes, args.max_steps)
 
     train_dataiter = mx.io.PrefetchingIter(train_dataiter)

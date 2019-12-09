@@ -301,6 +301,7 @@ class FaceImageIter(io.DataIter):
         """Resets the iterator to the beginning of the data."""
         print('call reset()')
         self.dataset.reset()
+        self.seq = list(range(len(self.dataset)))
         self.cur = 0
         if self.shuffle:
             random.shuffle(self.seq)
