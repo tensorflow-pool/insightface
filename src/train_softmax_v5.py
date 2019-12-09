@@ -112,6 +112,9 @@ class LossValueMetric(mx.metric.EvalMetric):
         # print(gt_label)
 
 
+# TrainParams = namedtuple('TrainParams', ['base_lr_steps', "lr_steps", "mas", "epoch_sizes"])
+# TrainParams.__new__.__defaults__ = ([], [], [])
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Train face network')
 
@@ -126,7 +129,7 @@ def parse_args():
 
     parser.add_argument('--load_weight', type=int, default=0, help='重新加载feature')
     parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
-    parser.add_argument('--per-batch-size', type=int, default=48, help='batch size in each context')
+    parser.add_argument('--per_batch_size', type=int, default=48, help='batch size in each context')
 
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
@@ -138,9 +141,8 @@ def parse_args():
     # parser.add_argument('--pretrained', default='./train/models_2019-12-05-21:08:10/model,70060', help='pretrained model to load')
     parser.add_argument('--pretrained', default='./train/models_2019-12-06-09:51:21/model,231021', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='', help='pretrained model to load')
-    parser.add_argument('--loss-type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
-    parser.add_argument('--max-steps', type=int, default=0, help='max training batches')
-    parser.add_argument('--end-epoch', type=int, default=100000, help='training epoch size.')
+    parser.add_argument('--loss_type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
+    parser.add_argument('--max_steps', type=int, default=0, help='max training batches')
     parser.add_argument('--network', default='r100', help='specify network')
     parser.add_argument('--image-size', default='112,112', help='specify input image height and width')
     parser.add_argument('--version-se', type=int, default=0, help='whether to use se in network')
@@ -150,7 +152,7 @@ def parse_args():
     parser.add_argument('--version-multiplier', type=float, default=1.0, help='filters multiplier')
     parser.add_argument('--version-act', type=str, default='prelu', help='network activation config')
     parser.add_argument('--use-deformable', type=int, default=0, help='use deformable cnn in network')
-    parser.add_argument('--lr-steps', type=str, default='', help='steps of lr changing')
+    parser.add_argument('--lr_steps', type=str, default='', help='steps of lr changing')
     parser.add_argument('--wd', type=float, default=0.0005, help='weight decay')
     parser.add_argument('--fc7-wd-mult', type=float, default=1.0, help='weight decay mult for fc7')
     parser.add_argument('--fc7-lr-mult', type=float, default=1.0, help='lr mult for fc7')
@@ -445,8 +447,6 @@ def train_net(args):
 
     ctx = [mx.gpu()]
     logging.info('use gpu0')
-
-    end_epoch = args.end_epoch
     args.ctx_num = len(ctx)
     args.num_layers = int(args.network[1:])
     logging.info('num_layers %s', args.num_layers)
@@ -557,39 +557,24 @@ def train_net(args):
     #  highest_acc.append(0.0)
     global_step = [0]
 
-    base_lr_steps = [8, 12, 16]
-    base_lr_steps = [4, 6, 8]
     if len(args.lr_steps) == 0:
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
-        lr_steps = base_lr_steps.copy()
-        p = train_dataiter.num_samples() / args.batch_size
-        # 加速
-        # if p > 20000:
-        #     p = p / 2
-        for l in range(len(lr_steps)):
-            # lr_steps[l] = int(lr_steps[l])
-            lr_steps[l] = int(lr_steps[l] * p)
-        if len(lr_steps) == 1:
-            args.max_steps = 2 * lr_steps[-1] + 120
-        else:
-            args.max_steps = 2 * lr_steps[-1] - lr_steps[-2] + 120
+        lr_steps = [8, 12, 16]
+        lr_steps = [4, 6, 8]
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
-    epoch_size = int(dataset.pic_len / args.batch_size)
-    logging.info('lr_steps %s epoch_size %s', lr_steps, epoch_size)
+    if len(lr_steps) == 1:
+        end_epoch = 2 * lr_steps[-1]
+    else:
+        end_epoch = 2 * lr_steps[-1] - lr_steps[-2]
+    epoch_sizes = [dataset.pic_len / args.batch_size] * end_epoch
+    args.max_steps = np.sum(epoch_sizes)
+    args.lr_steps = lr_steps
     start_time = time.time()
 
     def _batch_callback(param):
-        # global global_step
-        global_step[0] += 1
         mbatch = global_step[0]
-        for _lr in lr_steps:
-            if mbatch == args.beta_freeze + _lr:
-                opt.lr *= 0.1
-                logging.info('lr change to %s', opt.lr)
-                break
-
         acc = param.eval_metric.get_name_value()[0][1]
         loss = param.eval_metric.get_name_value()[1][1]
         real_acc = param.eval_metric.get_name_value()[2][1]
@@ -599,7 +584,7 @@ def train_net(args):
             speed = spend / global_step[0]
             left = (args.max_steps - global_step[0]) * speed
             logging.info('=================>lr-batch-epoch: lr %s, nbatch/epoch_size %s/%s,  epoch %s, step %s spend/left %.02f/%.02f',
-                         opt.lr, param.nbatch, epoch_size, param.epoch, global_step[0], spend, left)
+                         opt.lr, param.nbatch, int(dataset.pic_len / args.batch_size), param.epoch, global_step[0], spend, left)
 
         sw.add_scalar(tag='lr', value=opt.lr, global_step=mbatch)
         sw.add_scalar(tag='acc', value=acc, global_step=mbatch)
@@ -634,55 +619,47 @@ def train_net(args):
             _beta = max(args.beta_min, args.beta * math.pow(1 + args.gamma * move, -1.0 * args.power))
         # logging.info('beta', _beta)
         os.environ['BETA'] = str(_beta)
-        if args.max_steps > 0 and mbatch > args.max_steps:
-            sys.exit(0)
+        # global global_step
+        global_step[0] += 1
 
     def epoch_cb(epoch, symbol, arg, aux):
-        mbatch = global_step[0]
+        logging.info("================>epoch_cb epoch %s g_step %s args.lr_steps %s", epoch, global_step[0], args.lr_steps)
+        for _lr in args.lr_steps:
+            if epoch == args.beta_freeze + _lr:
+                opt.lr *= 0.1
+                logging.info('lr change to %s', opt.lr)
+                break
         if len(ver_list) > 0:
-            acc_list = ver_test(mbatch)
-            logging.info('[%d]Accuracy-Highest: %s' % (mbatch, acc_list))
+            acc_list = ver_test(epoch)
+            logging.info('[%d]Accuracy-Highest: %s' % (epoch, acc_list))
             sw.add_scalar(tag='val', value=acc_list[0], global_step=global_step[0])
 
-        logging.info('saving %s', mbatch)
+        logging.info('saving %s', epoch)
         arg, aux = model.get_params()
         new_arg = {}
         for k in arg:
             if k == "fc7_weight":
                 continue
             new_arg[k] = arg[k]
+        # 暂时不过滤weight
         new_arg = arg
-        mx.model.save_checkpoint(prefix + "/model", mbatch, model.symbol[0].get_children(), new_arg, aux)
+        mx.model.save_checkpoint(prefix + "/model", epoch, model.symbol[0].get_children(), new_arg, aux)
 
         # 11-12w人
         # 10 100w
         # 50 310-350w
         # 100 500w
-        logging.info("================>epoch_cb epoch %s g_step %s base_lr_steps %s", epoch, global_step[0], base_lr_steps)
-        if epoch == base_lr_steps[-2]:
+        if epoch == args.lr_steps[-2]:
             dataset.max_images = 50
-            dataset.reset()
-            p = dataset.pic_len / args.batch_size
-            lr_steps[-2] = int(base_lr_steps[-2] * p)
-            lr_steps[-1] = int(base_lr_steps[-1] * p)
-            if len(lr_steps) == 1:
-                args.max_steps = 2 * lr_steps[-1] + 120
-            else:
-                args.max_steps = 2 * lr_steps[-1] - lr_steps[-2] + 120
-            logging.info("================>change max_images to 50 epoch %s g_step %s max_steps %s lr_steps %s", epoch, global_step[0], args.max_steps, lr_steps)
-        if epoch == base_lr_steps[-1]:
+        if epoch == lr_steps[-1]:
             dataset.max_images = 300
-            dataset.reset()
-            p = dataset.pic_len / args.batch_size
-            lr_steps[-1] = int(base_lr_steps[-1] * p)
-            if len(lr_steps) == 1:
-                args.max_steps = 2 * lr_steps[-1] + 120
-            else:
-                args.max_steps = 2 * lr_steps[-1] - lr_steps[-2] + 120
-            logging.info("================>change max_images to 300 epoch %s g_step %s max_steps %s lr_steps %s", epoch, global_step[0], args.max_steps, lr_steps)
+        dataset.reset()
+        for index in range(epoch, end_epoch):
+            epoch_sizes[index] = dataset.pic_len / args.batch_size
+            args.max_steps = np.sum(epoch_sizes)
+        logging.info("================>change max_images to %s epoch %s g_step %s max_steps %s epoch_sizes %s ", dataset.max_images, epoch, global_step[0], epoch_sizes, args.max_steps)
 
     train_dataiter = mx.io.PrefetchingIter(train_dataiter)
-
     model.fit(train_dataiter,
               begin_epoch=begin_epoch,
               num_epoch=end_epoch,
