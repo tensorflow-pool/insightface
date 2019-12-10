@@ -3,13 +3,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import leveldb
 import logging
 import os
 import random
+import threading
 from collections import defaultdict
+from queue import Queue
 
 import cv2
-import leveldb
 import mxnet as mx
 import numpy as np
 from mxnet import io, nd
@@ -20,7 +22,7 @@ logger = logging.getLogger()
 class FaceDataset(mx.gluon.data.Dataset):
     pic_db_dict = {}
 
-    def __init__(self, leveldb_path, label_path, min_images=0, max_images=11111111111, ignore_labels=set()):
+    def __init__(self, leveldb_path, label_path, pic_ignore=os.path.expanduser("~/datasets/cacher/picture.ignore"), min_images=0, max_images=11111111111, ignore_labels=set()):
         super(FaceDataset, self).__init__()
         assert leveldb_path
         logger.info('loading FaceDataset %s %s min_images %s max_images %s', leveldb_path, label_path, min_images, max_images)
@@ -35,6 +37,13 @@ class FaceDataset(mx.gluon.data.Dataset):
             self.filter_labels = set(self.filter_labels)
             # logger.info("FaceDataset filter_labels %s", self.filter_labels)
 
+        self.ignore_pic_ids = set()
+        if os.path.exists(pic_ignore):
+            pic_ids = open(pic_ignore).readlines()
+            pic_ids = [pic_id.strip() for pic_id in pic_ids]
+            self.ignore_pic_ids = set(pic_ids)
+            # logger.info("FaceDataset ignore_pic_ids %s", self.ignore_pic_ids)
+
         if leveldb_path in self.pic_db_dict:
             self.pic_db = self.pic_db_dict[leveldb_path]
         else:
@@ -48,7 +57,7 @@ class FaceDataset(mx.gluon.data.Dataset):
             for index, line in enumerate(lines):
                 pic_id, label = line.strip().split(",")
                 label = int(label)
-                if label == -1 or label in ignore_labels or label in self.filter_labels:
+                if label == -1 or label in ignore_labels or label in self.filter_labels or pic_id in self.ignore_pic_ids:
                     continue
                 self.base_pic_ids.append(pic_id)
                 self.base_labels.append(label)
@@ -172,7 +181,17 @@ class FaceDataset(mx.gluon.data.Dataset):
             label2score[label] = mean
         return label2score
 
-    def check_warning_labels(self, leveldb_feature_path, th=None, random_select=100):
+    def db_clear(self, pic_ids):
+        clear_labels = {}
+        for index, pic in enumerate(self.pic_ids):
+            if pic in pic_ids:
+                label = self.labels[index]
+                # clear_labels.append(label)
+                clear_labels[label] = 1
+                self.delete_label(label)
+        return clear_labels
+
+    def check_warning_labels(self, leveldb_feature_path, th=None, random_select=30):
         if not os.path.exists(self.path_label_check):
             if os.path.exists(leveldb_feature_path):
                 fea_db = leveldb.LevelDB(leveldb_feature_path, max_open_files=100)
@@ -386,6 +405,7 @@ class FaceImageIter(io.DataIter):
 
 if __name__ == '__main__':
     from PIL import Image
+
     random.seed(100)
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(thread)d %(filename)s[line:%(lineno)d] %(levelname)s %(message)s')
 
