@@ -566,7 +566,7 @@ def train_net(args):
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         lr_steps = [8, 12, 16]
-        lr_steps = [4, 6, 8]
+        lr_steps = [3, 5, 6]
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
     if len(lr_steps) == 1:
@@ -661,9 +661,9 @@ def train_net(args):
         # 50 310-350w
         # 100 500w
         # 改变学习率的第一个epoch不变
-        if epoch == _lr_steps[-2] + 1:
+        if epoch == _lr_steps[-2]:
             dataset.max_images = 50
-        if epoch == _lr_steps[-1] + 1:
+        if epoch == _lr_steps[-1]:
             dataset.max_images = 300
         dataset.reset()
         # 下一个epoch才生效
