@@ -123,11 +123,11 @@ def parse_args():
     # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.05_30")
     # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.38_39")
     # 0.6合并的(现在都清理了白鹭郡测试数据)
-    # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.35/pictures.labels.35.33_34")
+    label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.35/pictures.labels.35.33_34")
     # 0.5合并的(现在都清理了白鹭郡测试数据)
     # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.48/pictures.labels.48.46_47")
     # 0.5合并的，并再次处理了剩余的(现在都清理了白鹭郡测试数据)
-    label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.48/left_pictures.labels.48.46_47")
+    # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.48/left_pictures.labels.48.46_47")
     parser.add_argument('--label_path', default=label_path, help='training set directory')
     target = os.path.expanduser("~/datasets/maysa/lfw.bin")
     parser.add_argument('--target', type=str, default=target, help='verification targets')
@@ -566,7 +566,7 @@ def train_net(args):
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         lr_steps = [8, 12, 16]
-        lr_steps = [4, 6, 8]
+        lr_steps = [3, 6, 8]
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
     if len(lr_steps) == 1:
