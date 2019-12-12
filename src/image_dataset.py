@@ -3,7 +3,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import leveldb
 import logging
 import os
 import random
@@ -12,6 +11,7 @@ from collections import defaultdict
 from queue import Queue
 
 import cv2
+import leveldb
 import mxnet as mx
 import numpy as np
 from mxnet import io, nd
@@ -29,20 +29,35 @@ class FaceDataset(mx.gluon.data.Dataset):
         self.leveldb_path = leveldb_path
         self.label_path = label_path
         self.path_imgidx_filter = label_path + ".filter"
-        self.path_label_check = label_path + ".check"
-        self.filter_labels = set()
-        if os.path.exists(self.path_imgidx_filter):
-            filtered_labels = open(self.path_imgidx_filter).readlines()
-            self.filter_labels = [int(l) for l in filtered_labels]
-            self.filter_labels = set(self.filter_labels)
-            # logger.info("FaceDataset filter_labels %s", self.filter_labels)
+        self.path_label_merged = label_path + ".merged"
 
         self.ignore_pic_ids = set()
         if os.path.exists(pic_ignore):
             pic_ids = open(pic_ignore).readlines()
             pic_ids = [pic_id.strip() for pic_id in pic_ids]
             self.ignore_pic_ids = set(pic_ids)
-            # logger.info("FaceDataset ignore_pic_ids %s", self.ignore_pic_ids)
+            logger.info("FaceDataset ignore_pic_ids %s", len(self.ignore_pic_ids))
+
+        self.filter_labels = set()
+        if os.path.exists(self.path_imgidx_filter):
+            filtered_labels = open(self.path_imgidx_filter).readlines()
+            self.filter_labels = [int(l) for l in filtered_labels]
+            self.filter_labels = set(self.filter_labels)
+            logger.info("FaceDataset filter_labels %s", len(self.filter_labels))
+
+        self.replace_labels = {}
+        self.replace_label_set = set()
+        if os.path.exists(self.path_label_merged):
+            lines = open(self.path_label_merged).readlines()
+            for merged_labels in lines:
+                labels = [int(l) for l in merged_labels.strip().split(",") if int(l) not in self.filter_labels]
+                labels = sorted(labels)
+                if len(labels) > 1:
+                    assert len(self.replace_label_set.intersection(set(labels))) == 0
+                    self.replace_label_set.update(set(labels))
+                    for l in labels[:-1]:
+                        self.replace_labels[l] = labels[-1]
+            logger.info("FaceDataset replace_labels %s", len(self.replace_labels))
 
         if leveldb_path in self.pic_db_dict:
             self.pic_db = self.pic_db_dict[leveldb_path]
@@ -57,6 +72,8 @@ class FaceDataset(mx.gluon.data.Dataset):
             for index, line in enumerate(lines):
                 pic_id, label = line.strip().split(",")
                 label = int(label)
+                if label in self.replace_labels:
+                    label = self.replace_labels[label]
                 if label == -1 or label in ignore_labels or label in self.filter_labels or pic_id in self.ignore_pic_ids:
                     continue
                 self.base_pic_ids.append(pic_id)
@@ -191,8 +208,22 @@ class FaceDataset(mx.gluon.data.Dataset):
                 self.delete_label(label)
         return clear_labels
 
+    def save_processed(self):
+        path_label_processed = self.label_path + ".processed"
+        logger.info("path_label_processed label_len %s order_labels %s", self.label_len, len(self.order_labels))
+        assert self.label_len == len(self.order_labels)
+        with open(path_label_processed, "w") as file:
+            for i in range(self.label_len):
+                label = self.order_labels[i]
+                pic_ids = self.label2pic[label]
+                for pic_id in pic_ids:
+                    if label == -1:
+                        continue
+                    file.write("{},{}\n".format(pic_id, label))
+
     def check_warning_labels(self, leveldb_feature_path, th=None, random_select=30):
-        if not os.path.exists(self.path_label_check):
+        path_label_check = self.label_path + ".check"
+        if not os.path.exists(path_label_check):
             if os.path.exists(leveldb_feature_path):
                 fea_db = leveldb.LevelDB(leveldb_feature_path, max_open_files=100)
                 # label2score = self.check_labels(random_select, fea_db)
@@ -209,7 +240,7 @@ class FaceDataset(mx.gluon.data.Dataset):
             per_counts = [c / len(label2score) for c in counts]
             logger.info("sections %s counts %s per_counts %s", sections, counts, per_counts)
 
-            with open(self.path_label_check, "w") as file:
+            with open(path_label_check, "w") as file:
                 items = list(label2score.items())
                 items = sorted(items, key=lambda x: x[1])
                 for k, v in items:
@@ -217,7 +248,7 @@ class FaceDataset(mx.gluon.data.Dataset):
                     file.write("\n")
 
         label2score = {}
-        with open(self.path_label_check, "r") as file:
+        with open(path_label_check, "r") as file:
             items = file.readlines()
             for line in items:
                 label, score_mean = line.strip().split(",")
@@ -230,6 +261,260 @@ class FaceDataset(mx.gluon.data.Dataset):
                         self.delete_label(label)
                         label2score[label] = float(score_mean)
         return label2score
+
+    def inner_check(self, th=0.5, percent=0.5, check_count=10, leveldb_feature_path=os.path.expanduser("~/datasets/cacher/features")):
+        cache_path = self.label_path + ".inner_check_%.2f" % th
+        if not os.path.exists(cache_path):
+            if os.path.exists(leveldb_feature_path):
+                features = []
+                face_ids = []
+                face_labels = []
+                clusters = defaultdict(list)
+                fea_db = leveldb.LevelDB(leveldb_feature_path, max_open_files=100)
+                for batch_index, label in enumerate(self.order_labels):
+                    if batch_index % 1000 == 0:
+                        logger.info("label_features batch_index/count %s/%s", batch_index, self.label_len)
+                    pic_ids = self.label2pic[label]
+                    pic_ids = random.sample(pic_ids, min(check_count, len(pic_ids)))
+                    for index, pic_id in enumerate(pic_ids):
+                        clusters[label].append(index)
+                        face_ids.append(pic_id)
+                        face_labels.append(label)
+                        try:
+                            pic_id = str(pic_id).encode('utf-8')
+                            data = fea_db.Get(pic_id)
+                            features.append(np.frombuffer(data, dtype=np.float32)[:512])
+                        except Exception as e:
+                            logger.info("pic_id %s no pic", pic_id)
+                            sys.exit()
+
+                face_features = np.array(features, dtype=np.float32)
+                params = cdp.ClusterParams(features=face_features, labels=np.ones(len(face_features)) * -1, th_knn=th, valid_percent=percent)
+                clusters_list = list(clusters.values())
+                new_clusters = cdp.filter_clusters_by_features(clusters_list, params)
+
+                result = defaultdict(set)
+                for c in new_clusters:
+                    if len(c) == 1:
+                        index = c[0]
+                        result[face_labels[index]].add(face_ids[index])
+                for key in result.keys():
+                    result[key] = list(result[key])
+                # key为标签，val为过滤的face_id
+                with open(cache_path, "w") as file:
+                    for label in result:
+                        pic_ids = result[label]
+                        file.write("{}:{}\n".format(label, ",".join(pic_ids)))
+            else:
+                result = defaultdict(set)
+        else:
+            lines = open(cache_path, "r").readlines()
+            result = {}
+            for line in lines:
+                label, pic_ids = line.strip().split(":")
+                result[int(label)] = [p for p in pic_ids.split(",")]
+        for label in list(result.keys()):
+            # 已经不在了,就不要了
+            if label not in self.label2pic or label in self.filter_labels:
+                del result[label]
+        return result
+
+    def inter_check(self, th, check_count=10, leveldb_feature_path=os.path.expanduser("~/datasets/cacher/features")):
+        cache_path = self.label_path + ".inter_check_%.2f" % th
+        if not os.path.exists(cache_path):
+            if os.path.exists(leveldb_feature_path):
+                features = []
+                face_ids = []
+                face_labels = []
+                clusters = defaultdict(list)
+                fea_db = leveldb.LevelDB(leveldb_feature_path, max_open_files=100)
+                for batch_index, label in enumerate(self.order_labels):
+                    if batch_index % 1000 == 0:
+                        logger.info("label_features batch_index/count %s/%s", batch_index, self.label_len)
+                    pic_ids = self.label2pic[label]
+                    pic_ids = random.sample(pic_ids, min(check_count, len(pic_ids)))
+                    for index, pic_id in enumerate(pic_ids):
+                        clusters[label].append(index)
+                        face_ids.append(pic_id)
+                        face_labels.append(label)
+                        try:
+                            pic_id = str(pic_id).encode('utf-8')
+                            data = fea_db.Get(pic_id)
+                            features.append(np.frombuffer(data, dtype=np.float32)[:512])
+                        except Exception as e:
+                            logger.info("pic_id %s no pic", pic_id)
+                            sys.exit()
+
+                face_features = np.array(features, dtype=np.float32)
+                max_size = int(math.sqrt(len(face_features)) * 20)
+                params = cdp.ClusterParams(features=face_features, labels=np.ones(len(face_features)) * -1, th_knn=th, max_size=max_size, single_filter=False)
+                pred_labels, _ = cdp.cluster(params)
+
+                label2faceids = defaultdict(list)
+                label2labels = defaultdict(list)
+                for index, label in enumerate(pred_labels):
+                    if label == -1:
+                        continue
+                    label2faceids[label].append(face_ids[index])
+                    label2labels[label].append(face_labels[index])
+
+                conflict_list = []
+                for key in label2labels:
+                    label_face_ids = label2faceids[key]
+                    label_list = label2labels[key]
+                    # print(label_list)
+                    if len(set(label_list)) > 1:
+                        conflict_list.append([label_list, label_face_ids])
+                # logger.info("label_inter_check conflict_list %s", conflict_list)
+                # key为标签，val为过滤的face_id
+                with open(cache_path, "w") as file:
+                    for item in conflict_list:
+                        label_list_str = ",".join([str(l) for l in item[0]])
+                        face_ids_str = ",".join(item[1])
+                        file.write("{};{}\n".format(label_list_str, face_ids_str))
+            else:
+                conflict_list = []
+        else:
+            with cost.Timer("load file"):
+                lines = open(cache_path, "r").readlines()
+                conflict_list = []
+                for line in lines:
+                    label_list_str, face_ids_str = line.strip().split(";")
+                    label_list = [int(l) for l in label_list_str.split(",")]
+                    label_face_ids = [face_id for face_id in face_ids_str.split(",")]
+                    conflict_list.append([label_list, label_face_ids])
+
+        with cost.Timer("filter"):
+            conflict_list_filtered = []
+            pic_ids_set = set(self.pic_ids)
+            for item in conflict_list:
+                labels = []
+                pic_ids = []
+                for index in range(len(item[0])):
+                    label = item[0][index]
+                    pic_id = item[1][index]
+                    if label in self.label2pic and pic_id in pic_ids_set and label not in self.filter_labels and label not in self.replace_labels:
+                        labels.append(label)
+                        pic_ids.append(pic_id)
+                if len(set(labels)) > 1:
+                    conflict_list_filtered.append([labels, pic_ids])
+        return conflict_list_filtered
+
+    def merge_label(self, labels):
+        labels = list(set(labels))
+        labels = sorted(labels)
+        if len(labels) > 1:
+            assert len(self.replace_label_set.intersection(set(labels))) == 0
+            self.replace_label_set.update(set(labels))
+            for label in labels[:-1]:
+                self.replace_labels[label] = labels[-1]
+            merged_dict = defaultdict(set)
+            for k, v in self.replace_labels.items():
+                merged_dict[v].add(k)
+                merged_dict[v].add(v)
+            with open(self.path_label_merged, "w") as file:
+                for target in merged_dict:
+                    labels = merged_dict[target]
+                    labels = sorted(labels)
+                    labels = [str(l) for l in labels]
+                    file.write((",").join(labels))
+                    file.write("\n")
+
+    def merge_all(self, th):
+        cache_path = self.label_path + ".inter_check_%.2f" % th
+        if not os.path.exists(cache_path):
+            logger.info("merge_all cache_path %s not existed", cache_path)
+            return
+        with cost.Timer("load file"):
+            lines = open(cache_path, "r").readlines()
+            conflict_list = []
+            for line in lines:
+                label_list_str, face_ids_str = line.strip().split(";")
+                label_list = [int(l) for l in label_list_str.split(",")]
+                label_face_ids = [face_id for face_id in face_ids_str.split(",")]
+                conflict_list.append([label_list, label_face_ids])
+        with cost.Timer("filter"):
+            pic_ids_set = set(self.pic_ids)
+            for item in conflict_list:
+                labels = []
+                pic_ids = []
+                for index in range(len(item[0])):
+                    label = item[0][index]
+                    pic_id = item[1][index]
+                    if label in self.label2pic and pic_id in pic_ids_set and label not in self.filter_labels and label not in self.replace_labels:
+                        labels.append(label)
+                        pic_ids.append(pic_id)
+                if len(set(labels)) > 1:
+                    # assert len(self.replace_label_set.intersection(set(labels))) == 0
+                    # self.replace_label_set.update(set(labels))
+                    labels = sorted(labels)
+                    for label in labels[:-1]:
+                        self.replace_labels[label] = labels[-1]
+
+        with cost.Timer("writer merged"):
+            merged_dict = defaultdict(set)
+            for k, v in self.replace_labels.items():
+                if k != v and k in merged_dict:
+                    # 已经当做目标了,就循环把原来的目标改为现在的
+                    origin = merged_dict[k]
+                    del merged_dict[k]
+                    merged_dict[v].update(origin)
+                    merged_dict[v].add(k)
+                    merged_dict[v].add(v)
+                    logger.info("merged passed %s->%s origin %s", k, v, origin)
+                else:
+                    merged_dict[v].add(k)
+                    merged_dict[v].add(v)
+            with open(self.path_label_merged, "w") as file:
+                for target in merged_dict:
+                    labels = merged_dict[target]
+                    labels = sorted(labels)
+                    labels = [str(l) for l in labels]
+                    file.write((",").join(labels))
+                    file.write("\n")
+
+    def merge_filter(self, th):
+        cache_path = self.label_path + ".inter_check_%.2f" % th
+        if not os.path.exists(cache_path):
+            logger.info("merge_filter cache_path %s not existed", cache_path)
+            return
+        with cost.Timer("load file"):
+            lines = open(cache_path, "r").readlines()
+            conflict_list = []
+            for line in lines:
+                label_list_str, face_ids_str = line.strip().split(";")
+                label_list = [int(l) for l in label_list_str.split(",")]
+                label_face_ids = [face_id for face_id in face_ids_str.split(",")]
+                conflict_list.append([label_list, label_face_ids])
+        with cost.Timer("filter"):
+            filter_count = 0
+            pic_ids_set = set(self.pic_ids)
+            for item in conflict_list:
+                labels = []
+                pic_ids = []
+                for index in range(len(item[0])):
+                    label = item[0][index]
+                    pic_id = item[1][index]
+                    if label in self.label2pic and pic_id in pic_ids_set and label not in self.filter_labels and label not in self.replace_labels:
+                        labels.append(label)
+                        pic_ids.append(pic_id)
+                if len(set(labels)) > 1:
+                    max_label = None
+                    max_count = 0
+                    for label in labels:
+                        if len(self.label2pic[label]) > max_count:
+                            max_count = len(self.label2pic[label])
+                            max_label = label
+                    for label in labels:
+                        if max_label != label:
+                            filter_count += 1
+                            self.filter_labels.add(label)
+            logger.info("filter_count %s", filter_count)
+
+        with open(self.path_imgidx_filter, "w") as file:
+            for l in sorted(self.filter_labels, reverse=False):
+                file.write(str(l))
+                file.write("\n")
 
     def label_features(self, leveldb_feature_path):
         ret_features = nd.empty((self.label_len, 512))
