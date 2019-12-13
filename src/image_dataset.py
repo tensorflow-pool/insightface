@@ -7,6 +7,7 @@ import logging
 import os
 import random
 import threading
+import time
 from collections import defaultdict
 from queue import Queue
 
@@ -32,7 +33,7 @@ class FaceDataset(mx.gluon.data.Dataset):
         self.path_label_merged = label_path + ".merged"
 
         self.ignore_pic_ids = set()
-        if "processed" not in label_path and  os.path.exists(pic_ignore):
+        if "processed" not in label_path and os.path.exists(pic_ignore):
             pic_ids = open(pic_ignore).readlines()
             pic_ids = [pic_id.strip() for pic_id in pic_ids]
             self.ignore_pic_ids = set(pic_ids)
@@ -583,7 +584,7 @@ class FaceDataset(mx.gluon.data.Dataset):
 
 
 class FaceImageIter(io.DataIter):
-    def __init__(self, batch_size, data_shape, dataset, shuffle=False, gauss=0, data_name='data', label_name='softmax_label'):
+    def __init__(self, batch_size, data_shape, dataset, shuffle=False, gauss=0, data_name='data', label_name='softmax_label', queue_size=16):
         super(FaceImageIter, self).__init__()
         self.check_data_shape(data_shape)
         self.provide_data = [(data_name, (batch_size,) + data_shape)]
@@ -601,6 +602,13 @@ class FaceImageIter(io.DataIter):
         self.nbatch = 0
         self.is_init = False
 
+        self.data_queue = Queue(queue_size)
+        self.running = True
+        self.iter_start = False
+        self.thread = threading.Thread(target=self.process_data)
+        self.thread.daemon = True
+        self.thread.start()
+
     def reset(self):
         """Resets the iterator to the beginning of the data."""
         print('call reset()')
@@ -609,6 +617,7 @@ class FaceImageIter(io.DataIter):
         self.cur = 0
         if self.shuffle:
             random.shuffle(self.seq)
+        self.iter_start = True
 
     def num_samples(self):
         return self.dataset.pic_len
@@ -628,10 +637,23 @@ class FaceImageIter(io.DataIter):
             # logger.info("idx %s label %s", idx, label)
             return label, img, None, None
 
-    def next(self):
-        if not self.is_init:
-            self.reset()
-            self.is_init = True
+    def process_data(self):
+        while self.running:
+            if self.iter_start:
+                try:
+                    data = self.next_data()
+                    self.data_queue.put(data)
+                except StopIteration:
+                    self.data_queue.put(None)
+                    self.iter_start = False
+                    pass
+            else:
+                time.sleep(0.1)
+
+    def next_data(self):
+        # if not self.is_init:
+        #     self.reset()
+        #     self.is_init = True
         self.nbatch += 1
         batch_size = self.batch_size
         c, h, w = self.data_shape
@@ -670,6 +692,12 @@ class FaceImageIter(io.DataIter):
                 raise StopIteration
 
         return io.DataBatch([batch_data], [batch_label], batch_size - i)
+
+    def next(self):
+        data = self.data_queue.get()
+        if data is None:
+            raise StopIteration
+        return data
 
     def check_data_shape(self, data_shape):
         """Checks if the input data shape is valid"""
