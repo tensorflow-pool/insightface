@@ -136,7 +136,7 @@ def parse_args():
 
     parser.add_argument('--load_weight', type=int, default=0, help='重新加载feature')
     parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
-    parser.add_argument('--per_batch_size', type=int, default=48, help='batch size in each context')
+    parser.add_argument('--per_batch_size', type=int, default=80, help='batch size in each context')
 
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
@@ -568,7 +568,7 @@ def train_net(args):
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         lr_steps = [8, 12, 16]
-        lr_steps = [3, 6, 8]
+        lr_steps = [4, 7, 9]
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
     if len(lr_steps) == 1:
