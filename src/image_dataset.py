@@ -608,10 +608,14 @@ class FaceImageIter(io.DataIter):
         self.thread = threading.Thread(target=self.process_data)
         self.thread.daemon = True
         self.thread.start()
+        self.reset()
 
     def reset(self):
         """Resets the iterator to the beginning of the data."""
-        print('call reset()')
+        print('call reset() iter_start %s',self.iter_start)
+        if self.iter_start:
+            # 没有走完一个迭代不能重置
+            return
         self.dataset.reset()
         self.seq = list(range(len(self.dataset)))
         self.cur = 0
