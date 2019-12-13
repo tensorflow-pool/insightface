@@ -612,7 +612,7 @@ class FaceImageIter(io.DataIter):
 
     def reset(self):
         """Resets the iterator to the beginning of the data."""
-        print('call reset() iter_start %s',self.iter_start)
+        logger.info('call reset() iter_start %s',self.iter_start)
         if self.iter_start:
             # 没有走完一个迭代不能重置
             return
