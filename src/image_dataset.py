@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import leveldb
 import logging
 import os
 import random
@@ -11,7 +12,6 @@ from collections import defaultdict
 from queue import Queue
 
 import cv2
-import leveldb
 import mxnet as mx
 import numpy as np
 from mxnet import io, nd
@@ -32,7 +32,7 @@ class FaceDataset(mx.gluon.data.Dataset):
         self.path_label_merged = label_path + ".merged"
 
         self.ignore_pic_ids = set()
-        if os.path.exists(pic_ignore):
+        if "processed" not in label_path and os.path.exists(pic_ignore):
             pic_ids = open(pic_ignore).readlines()
             pic_ids = [pic_id.strip() for pic_id in pic_ids]
             self.ignore_pic_ids = set(pic_ids)
