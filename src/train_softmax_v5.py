@@ -9,6 +9,7 @@ import math
 import os
 import sys
 
+import git
 import mxnet as mx
 import mxnet.optimizer as optimizer
 import numpy as np
@@ -434,8 +435,9 @@ def get_symbol(args, arg_params, aux_params):
 
 
 def train_net(args):
+    branch_name = git.Repo("..").active_branch.name
     prefix = time.strftime("%Y-%m-%d-%H:%M:%S")
-    file_path = "train/models_{}".format(prefix)
+    file_path = "train/{}_{}".format(branch_name, prefix)
     if not os.path.exists(file_path):
         os.makedirs(file_path)
 
@@ -457,6 +459,7 @@ def train_net(args):
     args.ctx_num = len(ctx)
     args.num_layers = int(args.network[1:])
     logging.info('num_layers %s', args.num_layers)
+    logging.info('branch_name %s', branch_name)
     if args.per_batch_size == 0:
         args.per_batch_size = 128
     args.batch_size = args.per_batch_size * args.ctx_num
