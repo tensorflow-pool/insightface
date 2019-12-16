@@ -16,7 +16,7 @@ import numpy as np
 from image_dataset import FaceImageIter, FaceDataset
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'common'))
-
+import git
 sys.path.append(os.path.join(os.path.dirname(__file__), 'eval'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'symbols'))
 import fresnet
@@ -434,8 +434,9 @@ def get_symbol(args, arg_params, aux_params):
 
 
 def train_net(args):
+    branch_name = git.Repo("..").active_branch.name
     prefix = time.strftime("%Y-%m-%d-%H:%M:%S")
-    file_path = "train/models_{}".format(prefix)
+    file_path = "train/{}_{}".format(branch_name, prefix)
     if not os.path.exists(file_path):
         os.makedirs(file_path)
 
@@ -457,6 +458,7 @@ def train_net(args):
     args.ctx_num = len(ctx)
     args.num_layers = int(args.network[1:])
     logging.info('num_layers %s', args.num_layers)
+    logging.info('branch name %s', branch_name)
     if args.per_batch_size == 0:
         args.per_batch_size = 128
     args.batch_size = args.per_batch_size * args.ctx_num
@@ -476,7 +478,7 @@ def train_net(args):
         args.gamma = 0.06
 
     data_shape = (args.image_channel, image_size[0], image_size[1])
-    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=10, max_images=10, ignore_labels={0})
+    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=10, max_images=300, ignore_labels={0})
     train_dataiter = FaceImageIter(
         batch_size=args.batch_size,
         data_shape=data_shape,
@@ -568,7 +570,7 @@ def train_net(args):
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         lr_steps = [8, 12, 16]
-        lr_steps = [4]
+        lr_steps = [1]
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
     if len(lr_steps) == 1:
