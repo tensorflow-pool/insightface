@@ -584,7 +584,7 @@ class FaceDataset(mx.gluon.data.Dataset):
 
 
 class FaceImageIter(io.DataIter):
-    def __init__(self, batch_size, data_shape, dataset, shuffle=False, gauss=0, data_name='data', label_name='softmax_label', queue_size=16):
+    def __init__(self, batch_size, data_shape, dataset, shuffle=False, gauss=0, data_name='data', label_name='softmax_label', queue_size=64):
         super(FaceImageIter, self).__init__()
         self.check_data_shape(data_shape)
         self.provide_data = [(data_name, (batch_size,) + data_shape)]
