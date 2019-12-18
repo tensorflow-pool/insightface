@@ -226,8 +226,7 @@ class FaceDataset(mx.gluon.data.Dataset):
         path_label_check = self.label_path + ".check"
         if not os.path.exists(path_label_check):
             if os.path.exists(leveldb_feature_path):
-                # fea_db = leveldb.LevelDB(leveldb_feature_path, max_open_files=100)
-                fea_db = leveldb.LevelDB(leveldb_feature_path)
+                fea_db = leveldb.LevelDB(leveldb_feature_path, max_open_files=100)
                 # label2score = self.check_labels(random_select, fea_db)
                 label2score = self.check_labels_by_thread(random_select, fea_db)
 
@@ -602,7 +601,7 @@ class FaceImageIter(io.DataIter):
         self.queue_size = queue_size
         self.running = True
         self.iter_start = False
-        for i in range(4):
+        for i in range(1):
             self.thread = threading.Thread(target=self.process_data)
             self.thread.daemon = True
             self.thread.start()
