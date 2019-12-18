@@ -622,7 +622,7 @@ def train_net(args):
             left = (args.max_steps - global_step[0]) * speed
             logging.info('lr-batch-epoch: lr %s, nbatch/epoch_size %s/%s,  epoch %s, step %s spend/left %.02f/%.02f',
                          opt.lr, param.nbatch, int(dataset.pic_len / args.batch_size), param.epoch, global_step[0], spend, left)
-
+            train_dataiter.print_info()
         # speed最后调用
         _cb(param)
 

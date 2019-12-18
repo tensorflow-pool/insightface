@@ -681,9 +681,12 @@ class FaceImageIter(io.DataIter):
         else:
             return None
 
+    def print_info(self):
+        logger.info("data_queue size %s", self.data_queue.qsize())
+
     def next(self):
         data = self.data_queue.get()
-        logger.info("data_queue size %s", self.data_queue.qsize())
+        # logger.info("data_queue size %s", self.data_queue.qsize())
         if data is None:
             raise StopIteration
         return data
