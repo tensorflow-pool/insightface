@@ -677,7 +677,7 @@ def train_net(args):
         # args.max_steps = np.sum(epoch_sizes)
         logging.info("================>change max_images to %s epoch %s g_step %s max_steps %s epoch_sizes %s ", dataset.max_images, epoch, global_step[0], epoch_sizes, args.max_steps)
 
-    train_dataiter = mx.io.PrefetchingIter(train_dataiter)
+    # train_dataiter = mx.io.PrefetchingIter(train_dataiter)
     model.fit(train_dataiter,
               begin_epoch=begin_epoch,
               num_epoch=end_epoch,
