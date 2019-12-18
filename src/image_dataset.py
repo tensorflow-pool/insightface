@@ -602,7 +602,7 @@ class FaceImageIter(io.DataIter):
         self.queue_size = queue_size
         self.running = True
         self.iter_start = False
-        for i in range(2):
+        for i in range(4):
             self.thread = threading.Thread(target=self.process_data)
             self.thread.daemon = True
             self.thread.start()
