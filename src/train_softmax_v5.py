@@ -135,7 +135,7 @@ def parse_args():
     target = os.path.expanduser("~/datasets/maysa/lfw.bin")
     parser.add_argument('--target', type=str, default=target, help='verification targets')
 
-    parser.add_argument('--load_weight', type=int, default=1, help='重新加载feature')
+    parser.add_argument('--load_weight', type=int, default=0, help='重新加载feature')
     parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
     parser.add_argument('--per_batch_size', type=int, default=48, help='batch size in each context')
 
@@ -148,6 +148,7 @@ def parse_args():
     # parser.add_argument('--pretrained', default='./train/models_2019-11-06-14:24:12/model,492590', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/models_2019-12-05-21:08:10/model,70060', help='pretrained model to load')
     parser.add_argument('--pretrained', default='./train/models_2019-12-06-09:51:21/model,231021', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='./train/v17_2019-12-18-10:13:27/model,2', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='', help='pretrained model to load')
     parser.add_argument('--loss_type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
     parser.add_argument('--max_steps', type=int, default=0, help='max training batches')
@@ -572,6 +573,7 @@ def train_net(args):
         #     lr_steps = [100000, 140000, 160000]
         lr_steps = [8, 12, 16]
         lr_steps = [3, 6, 8]
+        lr_steps = [1, 4, 6]
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
     if len(lr_steps) == 1:
@@ -677,7 +679,7 @@ def train_net(args):
         args.max_steps = np.sum(epoch_sizes)
         logging.info("================>change max_images to %s epoch %s g_step %s max_steps %s epoch_sizes %s ", dataset.max_images, epoch, global_step[0], epoch_sizes, args.max_steps)
 
-    train_dataiter = mx.io.PrefetchingIter(train_dataiter)
+    # train_dataiter = mx.io.PrefetchingIter(train_dataiter)
     model.fit(train_dataiter,
               begin_epoch=begin_epoch,
               num_epoch=end_epoch,
