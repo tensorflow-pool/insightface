@@ -130,7 +130,7 @@ def parse_args():
     # 0.5合并的，并再次处理了剩余的(现在都清理了白鹭郡测试数据)
     # label_path = os.path.expanduser("/vdb/cacher/pictures.labels.48/left_pictures.labels.48.46_47")
     # 0.6合并的,并且合并了剩余的，并踢出了0.5merge的(现在都清理了白鹭郡等所有测试数据)
-    label_path = os.path.expanduser("/vdb/cacher/pictures.labels.35/left_pictures.labels.35.33_34.processed.v18")
+    label_path = os.path.expanduser("/vdb/cacher/pictures.labels.35/left_pictures.labels.35.33_34.processed.v19")
     parser.add_argument('--label_path', default=label_path, help='training set directory')
     target = os.path.expanduser("/vdb/maysa/lfw.bin")
     parser.add_argument('--target', type=str, default=target, help='verification targets')
