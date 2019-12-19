@@ -119,20 +119,20 @@ class LossValueMetric(mx.metric.EvalMetric):
 def parse_args():
     parser = argparse.ArgumentParser(description='Train face network')
 
-    leveldb_path = os.path.expanduser("~/datasets/cacher/pictures")
+    leveldb_path = os.path.expanduser("/vdb/cacher/pictures")
     parser.add_argument('--leveldb_path', default=leveldb_path, help='training set directory')
-    # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.05_30")
-    # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.38_39")
+    # label_path = os.path.expanduser("/vdb/cacher/pictures.labels.40/pictures.labels.40.05_30")
+    # label_path = os.path.expanduser("/vdb/cacher/pictures.labels.40/pictures.labels.40.38_39")
     # 0.6合并的(现在都清理了白鹭郡测试数据)
-    # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.35/pictures.labels.35.33_34")
+    # label_path = os.path.expanduser("/vdb/cacher/pictures.labels.35/pictures.labels.35.33_34")
     # 0.5合并的(现在都清理了白鹭郡测试数据)
-    # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.48/pictures.labels.48.46_47")
+    # label_path = os.path.expanduser("/vdb/cacher/pictures.labels.48/pictures.labels.48.46_47")
     # 0.5合并的，并再次处理了剩余的(现在都清理了白鹭郡测试数据)
-    # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.48/left_pictures.labels.48.46_47")
+    # label_path = os.path.expanduser("/vdb/cacher/pictures.labels.48/left_pictures.labels.48.46_47")
     # 0.6合并的,并且合并了剩余的，并踢出了0.5merge的(现在都清理了白鹭郡等所有测试数据)
-    label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.35/left_pictures.labels.35.33_34.processed.v18")
+    label_path = os.path.expanduser("/vdb/cacher/pictures.labels.35/left_pictures.labels.35.33_34.processed.v18")
     parser.add_argument('--label_path', default=label_path, help='training set directory')
-    target = os.path.expanduser("~/datasets/maysa/lfw.bin")
+    target = os.path.expanduser("/vdb/maysa/lfw.bin")
     parser.add_argument('--target', type=str, default=target, help='verification targets')
 
     parser.add_argument('--load_weight', type=int, default=1, help='重新加载feature')
@@ -509,7 +509,7 @@ def train_net(args):
         sym, arg_params, aux_params = mx.model.load_checkpoint(vec[0], int(vec[1]))
         logging.info("fc7_weight norm %s", mx.nd.norm(arg_params['fc7_weight'], axis=1).mean())
         if args.load_weight:
-            arg_params['fc7_weight'] = dataset.label_features(os.path.expanduser("~/datasets/cacher/features"))
+            arg_params['fc7_weight'] = dataset.label_features(os.path.expanduser("/vdb/cacher/features"))
         # del arg_params['fc7_weight']
         sym, arg_params, aux_params = get_symbol(args, arg_params, aux_params)
 
