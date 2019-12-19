@@ -623,6 +623,7 @@ def train_net(args):
             left = (args.max_steps - global_step[0]) * speed
             logging.info('lr-batch-epoch: lr %s, nbatch/epoch_size %s/%s,  epoch %s, step %s spend/left %.02f/%.02f',
                          opt.lr, param.nbatch, int(dataset.pic_len / args.batch_size), param.epoch, global_step[0], spend, left)
+            train_dataiter.print_info()
 
         # speed最后调用
         _cb(param)
@@ -677,7 +678,7 @@ def train_net(args):
         args.max_steps = np.sum(epoch_sizes)
         logging.info("================>change max_images to %s epoch %s g_step %s max_steps %s epoch_sizes %s ", dataset.max_images, epoch, global_step[0], epoch_sizes, args.max_steps)
 
-    train_dataiter = mx.io.PrefetchingIter(train_dataiter)
+    # train_dataiter = mx.io.PrefetchingIter(train_dataiter)
     model.fit(train_dataiter,
               begin_epoch=begin_epoch,
               num_epoch=end_epoch,

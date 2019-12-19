@@ -3,15 +3,16 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import leveldb
 import logging
 import os
 import random
 import threading
+import time
 from collections import defaultdict
 from queue import Queue
 
 import cv2
-import leveldb
 import mxnet as mx
 import numpy as np
 from mxnet import io, nd
@@ -583,7 +584,7 @@ class FaceDataset(mx.gluon.data.Dataset):
 
 
 class FaceImageIter(io.DataIter):
-    def __init__(self, batch_size, data_shape, dataset, shuffle=False, gauss=0, data_name='data', label_name='softmax_label'):
+    def __init__(self, batch_size, data_shape, dataset, shuffle=False, gauss=0, data_name='data', label_name='softmax_label', queue_size=64):
         super(FaceImageIter, self).__init__()
         self.check_data_shape(data_shape)
         self.provide_data = [(data_name, (batch_size,) + data_shape)]
@@ -595,20 +596,37 @@ class FaceImageIter(io.DataIter):
         self.image_size = '%d,%d' % (data_shape[1], data_shape[2])
         self.provide_label = [(label_name, (batch_size,))]
         # print(self.provide_label[0][1])
+
         self.dataset = dataset
-        self.seq = list(range(len(dataset)))
-        self.cur = 0
-        self.nbatch = 0
-        self.is_init = False
+        self.queue_size = queue_size
+        self.running = True
+        self.iter_start = False
+        for i in range(3):
+            self.thread = threading.Thread(target=self.process_data)
+            self.thread.daemon = True
+            self.thread.start()
+        self.reset()
 
     def reset(self):
         """Resets the iterator to the beginning of the data."""
-        print('call reset()')
+        logger.info('call reset() iter_start %s', self.iter_start)
+        if self.iter_start:
+            # 没有走完一个迭代不能重置
+            return
+        self.data_queue = Queue(self.queue_size)
+        self.seq = Queue(len(self.dataset))
         self.dataset.reset()
-        self.seq = list(range(len(self.dataset)))
-        self.cur = 0
+        batch_count = int(len(self.dataset) / self.batch_size)
         if self.shuffle:
-            random.shuffle(self.seq)
+            indexes = list(range(len(self.dataset)))
+            random.shuffle(indexes)
+            for b in range(batch_count):
+                self.seq.put(indexes[b * self.batch_size:(b + 1) * self.batch_size])
+        else:
+            indexes = list(range(len(self.dataset)))
+            for b in range(batch_count):
+                self.seq.put(indexes[b * self.batch_size:(b + 1) * self.batch_size])
+        self.iter_start = True
 
     def num_samples(self):
         return self.dataset.pic_len
@@ -616,32 +634,29 @@ class FaceImageIter(io.DataIter):
     def num_class(self):
         return self.dataset.label_len
 
-    def next_sample(self):
-        """Helper function for reading in next sample."""
-        # set total batch size, for example, 1800, and maximum size for each people, for example 45
-        while True:
-            if self.cur >= len(self.seq):
-                raise StopIteration
-            idx = self.seq[self.cur]
-            self.cur += 1
-            img, label, pic_id = self.dataset[idx]
-            # logger.info("idx %s label %s", idx, label)
-            return label, img, None, None
+    def process_data(self):
+        while self.running:
+            if self.iter_start:
+                data = self.next_data()
+                if data is None:
+                    self.data_queue.put(None)
+                    self.iter_start = False
+                else:
+                    self.data_queue.put(data)
+            else:
+                time.sleep(0.1)
 
-    def next(self):
-        if not self.is_init:
-            self.reset()
-            self.is_init = True
-        self.nbatch += 1
+    def next_data(self):
         batch_size = self.batch_size
         c, h, w = self.data_shape
         batch_data = nd.empty((batch_size, c, h, w))
         if self.provide_label is not None:
             batch_label = nd.empty(self.provide_label[0][1])
-        i = 0
-        try:
-            while i < batch_size:
-                label, _data, bbox, landmark = self.next_sample()
+        if self.seq.qsize() > 0:
+            indexes = self.seq.get()
+            for i, idx in enumerate(indexes):
+                _data, label, pic_id = self.dataset[idx]
+                # label, _data, bbox, landmark = self.seq.get()
                 if _data.shape[0] != self.data_shape[1]:
                     _data = mx.image.resize_short(_data, self.data_shape[1])
                 if self.gauss:
@@ -660,16 +675,21 @@ class FaceImageIter(io.DataIter):
                     logging.debug('Invalid image, skipping:  %s', str(e))
                     continue
                 for datum in data:
-                    assert i < batch_size, 'Batch size must be multiples of augmenter output length'
-                    # print(datum.shape)
                     batch_data[i][:] = self.postprocess_data(datum)
                     batch_label[i][:] = label
-                    i += 1
-        except StopIteration:
-            if i < batch_size:
-                raise StopIteration
+            return io.DataBatch([batch_data], [batch_label], batch_size - i)
+        else:
+            return None
 
-        return io.DataBatch([batch_data], [batch_label], batch_size - i)
+    def print_info(self):
+        logger.info("data_queue size %s", self.data_queue.qsize())
+
+    def next(self):
+        data = self.data_queue.get()
+        # logger.info("data_queue size %s", self.data_queue.qsize())
+        if data is None:
+            raise StopIteration
+        return data
 
     def check_data_shape(self, data_shape):
         """Checks if the input data shape is valid"""
