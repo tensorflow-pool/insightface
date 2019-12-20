@@ -135,7 +135,7 @@ def parse_args():
     parser.add_argument('--target', type=str, default=target, help='verification targets')
 
     parser.add_argument('--load_weight', type=int, default=0, help='重新加载feature')
-    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
+    parser.add_argument('--lr', type=float, default=0.001, help='start learning rate')
     parser.add_argument('--per_batch_size', type=int, default=48, help='batch size in each context')
 
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
@@ -146,7 +146,8 @@ def parse_args():
     # parser.add_argument('--pretrained', default='../models_retina100_2019-10-18/model,486201', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/models_2019-11-06-14:24:12/model,492590', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/models_2019-12-05-21:08:10/model,70060', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='./train/models_2019-12-12-23:04:29/model,9', help='pretrained model to load')
+    # parser.add_argument('--pretrained', default='./train/models_2019-12-12-23:04:29/model,9', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='./train/v26_2019-12-18-21:18:18/model,4', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='', help='pretrained model to load')
     parser.add_argument('--loss_type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
     parser.add_argument('--max_steps', type=int, default=0, help='max training batches')
@@ -571,6 +572,7 @@ def train_net(args):
         #     lr_steps = [100000, 140000, 160000]
         lr_steps = [8, 12, 16]
         lr_steps = [2, 6, 10]
+        lr_steps = [2, 6]
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
     if len(lr_steps) == 1:
