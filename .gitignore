@@ -128,3 +128,5 @@ src/eval/ijb
 train
 src/output
 src/nohup.out
+gender-age/output
+gender-age/nohup.out

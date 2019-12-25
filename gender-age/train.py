@@ -6,17 +6,19 @@ import argparse
 import logging
 import os
 import sys
+import time
 
+import git
 import mxnet as mx
 import mxnet.optimizer as optimizer
 import numpy as np
-
-from data import FaceImageIter
+from mxboard import SummaryWriter
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'common'))
 # import face_image
 import fresnet
 import fmobilenet
+from image_dataset import FaceDataset, FaceImageIter
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -120,32 +122,31 @@ class CUMMetric(mx.metric.EvalMetric):
 def parse_args():
     parser = argparse.ArgumentParser(description='Train face network')
     # general
-    parser.add_argument('--data-dir', default='', help='training set directory')
-    parser.add_argument('--prefix', default='../model/model', help='directory to save model.')
+    leveldb_path = os.path.expanduser("~/datasets/cacher/pictures")
+    parser.add_argument('--leveldb_path', default=leveldb_path, help='training set directory')
+    label_path = os.path.expanduser("~/datasets/cacher/pictures.high.labels.37/left_pictures.labels.37.35_36.processed.v30.sex_age")
+    parser.add_argument('--label_path', default=label_path, help='training set directory')
+
     parser.add_argument('--pretrained', default='', help='pretrained model to load')
-    parser.add_argument('--ckpt', type=int, default=1,
-                        help='checkpoint saving option. 0: discard saving. 1: save when necessary. 2: always save')
-    parser.add_argument('--loss-type', type=int, default=4, help='loss type')
-    parser.add_argument('--verbose', type=int, default=2000,
-                        help='do verification testing and model saving every verbose batches')
-    parser.add_argument('--max-steps', type=int, default=0, help='max training batches')
-    parser.add_argument('--end-epoch', type=int, default=100000, help='training epoch size.')
-    parser.add_argument('--network', default='r50', help='specify network')
-    parser.add_argument('--image-size', default='112,112', help='specify input image height and width')
-    parser.add_argument('--version-input', type=int, default=1, help='network input config')
-    parser.add_argument('--version-output', type=str, default='GAP', help='network embedding output config')
-    parser.add_argument('--version-act', type=str, default='prelu', help='network activation config')
-    parser.add_argument('--multiplier', type=float, default=1.0, help='')
+
     parser.add_argument('--lr', type=float, default=0.1, help='start learning rate')
-    parser.add_argument('--lr-steps', type=str, default='', help='steps of lr changing')
+    parser.add_argument('--lr_steps', type=str, default='4,8,12', help='steps of lr changing')
+    parser.add_argument('--per_batch_size', type=int, default=32, help='batch size in each context')
+
+    parser.add_argument('--max_steps', type=int, default=0, help='max training batches')
+    parser.add_argument('--network', default='r50', help='specify network')
+    parser.add_argument('--image_size', default='112,112', help='specify input image height and width')
+    parser.add_argument('--version_input', type=int, default=1, help='network input config')
+    parser.add_argument('--version_output', type=str, default='GAP', help='network embedding output config')
+    parser.add_argument('--version_act', type=str, default='prelu', help='network activation config')
+    parser.add_argument('--multiplier', type=float, default=1.0, help='')
     parser.add_argument('--wd', type=float, default=0.0005, help='weight decay')
-    parser.add_argument('--bn-mom', type=float, default=0.9, help='bn mom')
+    parser.add_argument('--bn_mom', type=float, default=0.9, help='bn mom')
     parser.add_argument('--mom', type=float, default=0.9, help='momentum')
-    parser.add_argument('--per-batch-size', type=int, default=128, help='batch size in each context')
-    parser.add_argument('--rand-mirror', type=int, default=1, help='if do random mirror in training')
+
+    parser.add_argument('--randmirror', type=int, default=1, help='if do random mirror in training')
     parser.add_argument('--cutoff', type=int, default=0, help='cut off aug')
     parser.add_argument('--color', type=int, default=0, help='color jittering aug')
-    parser.add_argument('--ce-loss', default=False, action='store_true', help='if output ce loss')
     args = parser.parse_args()
     return args
 
@@ -186,45 +187,45 @@ def get_symbol(args, arg_params, aux_params):
 
 
 def train_net(args):
-    ctx = []
-    cvd = os.environ['CUDA_VISIBLE_DEVICES'].strip()
-    if len(cvd) > 0:
-        for i in range(len(cvd.split(','))):
-            ctx.append(mx.gpu(i))
-    if len(ctx) == 0:
-        ctx = [mx.cpu()]
-        print('use cpu')
-    else:
-        print('gpu num:', len(ctx))
-    prefix = args.prefix
-    prefix_dir = os.path.dirname(prefix)
-    if not os.path.exists(prefix_dir):
-        os.makedirs(prefix_dir)
-    end_epoch = args.end_epoch
+    branch_name = git.Repo("..").active_branch.name
+    prefix = time.strftime("%Y-%m-%d-%H:%M:%S")
+    file_path = "train/{}_{}".format(branch_name, prefix)
+    if not os.path.exists(file_path):
+        os.makedirs(file_path)
+
+    sw = SummaryWriter(logdir=file_path)
+    logging.basicConfig()
+    logging.getLogger().setLevel(logging.INFO)
+    fh = logging.FileHandler("{}/train.log".format(file_path))
+    # create formatter#
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    # add formatter to ch
+    fh.setFormatter(formatter)
+    logging.getLogger().addHandler(fh)
+    prefix = file_path
+
+    args.pretrained = os.path.expanduser(args.pretrained)
+
+    ctx = [mx.gpu()]
+    logging.info('use gpu0')
     args.ctx_num = len(ctx)
     args.num_layers = int(args.network[1:])
-    print('num_layers', args.num_layers)
+    logging.info('num_layers %s', args.num_layers)
+    logging.info('branch name %s', branch_name)
     if args.per_batch_size == 0:
         args.per_batch_size = 128
     args.batch_size = args.per_batch_size * args.ctx_num
     args.rescale_threshold = 0
     args.image_channel = 3
 
-    data_dir_list = args.data_dir.split(',')
-    assert len(data_dir_list) == 1
-    data_dir = data_dir_list[0]
-    path_imgrec = None
-    path_imglist = None
     image_size = [int(x) for x in args.image_size.split(',')]
     assert len(image_size) == 2
     assert image_size[0] == image_size[1]
     args.image_h = image_size[0]
     args.image_w = image_size[1]
-    print('image_size', image_size)
-    path_imgrec = os.path.join(data_dir, "train.rec")
-    path_imgrec_val = os.path.join(data_dir, "val.rec")
+    logger.info('image_size %s', image_size)
 
-    print('Called with argument:', args)
+    logger.info('Called with argument: %s', args)
     data_shape = (args.image_channel, image_size[0], image_size[1])
     mean = None
 
@@ -232,13 +233,15 @@ def train_net(args):
     base_lr = args.lr
     base_wd = args.wd
     base_mom = args.mom
+
+    args.pretrained = os.path.expanduser(args.pretrained)
     if len(args.pretrained) == 0:
         arg_params = None
         aux_params = None
         sym, arg_params, aux_params = get_symbol(args, arg_params, aux_params)
     else:
         vec = args.pretrained.split(',')
-        print('loading', vec)
+        logger.info('loading %s', vec)
         _, arg_params, aux_params = mx.model.load_checkpoint(vec[0], int(vec[1]))
         sym, arg_params, aux_params = get_symbol(args, arg_params, aux_params)
 
@@ -248,26 +251,17 @@ def train_net(args):
         context=ctx,
         symbol=sym,
     )
-    val_dataiter = None
 
+    dataset = FaceDataset(leveldb_path=args.leveldb_path, label_path=args.label_path)
     train_dataiter = FaceImageIter(
         batch_size=args.batch_size,
         data_shape=data_shape,
-        path_imgrec=path_imgrec,
+        dataset=dataset,
         shuffle=True,
-        rand_mirror=args.rand_mirror,
-        mean=mean,
-        cutoff=args.cutoff,
-        color_jittering=args.color,
+        gauss=False
     )
-    val_dataiter = FaceImageIter(
-        batch_size=args.batch_size,
-        data_shape=data_shape,
-        path_imgrec=path_imgrec_val,
-        shuffle=False,
-        rand_mirror=False,
-        mean=mean,
-    )
+    val_dataiter = None
+    # val_dataiter = FaceDataset(leveldb_path=args.leveldb_path, label_path=args.label_path)
 
     metric = mx.metric.CompositeEvalMetric([AccMetric(), MAEMetric(), CUMMetric()])
 
@@ -281,32 +275,62 @@ def train_net(args):
     opt = optimizer.SGD(learning_rate=base_lr, momentum=base_mom, wd=base_wd, rescale_grad=_rescale)
     # opt = optimizer.Nadam(learning_rate=base_lr, wd=base_wd, rescale_grad=_rescale)
     som = 20
-    _cb = mx.callback.Speedometer(args.batch_size, som)
-    lr_steps = [int(x) for x in args.lr_steps.split(',')]
-
     global_step = [0]
+    _cb = mx.callback.Speedometer(args.batch_size, som)
+
+    lr_steps = [int(x) for x in args.lr_steps.split(',')]
+    if len(lr_steps) == 1:
+        end_epoch = 2 * lr_steps[-1]
+    else:
+        end_epoch = 2 * lr_steps[-1] - lr_steps[-2]
+    epoch_sizes = [int(train_dataiter.pic_len / args.batch_size)] * end_epoch
+    args.max_steps = np.sum(epoch_sizes)
+    args.lr_steps = lr_steps
+    start_time = time.time()
 
     def _batch_callback(param):
+        nbatch = param.nbatch
+        global_batch = global_step[0]
+
+        if nbatch != 0 and nbatch % 20 == 0:
+            sex_acc = param.eval_metric.get_name_value()[0][1]
+            age_acc = param.eval_metric.get_name_value()[1][1]
+            age_cum = param.eval_metric.get_name_value()[2][1]
+
+            sw.add_scalar(tag='lr', value=opt.lr, global_step=global_batch)
+            sw.add_scalar(tag='sex_acc', value=sex_acc, global_step=global_batch)
+            sw.add_scalar(tag='age_acc', value=age_acc, global_step=global_batch)
+            sw.add_scalar(tag='age_cum', value=age_cum, global_step=global_batch)
+
+            spend = (time.time() - start_time) / 3600
+            if global_batch == 0:
+                speed = 0
+            else:
+                speed = spend / global_batch
+            left = (args.max_steps - global_step[0]) * speed
+            logging.info('lr-batch-epoch: lr %s, nbatch/epoch_size %s/%s,  epoch %s, step %s spend/left %.02f/%.02f',
+                         opt.lr, param.nbatch, int(train_dataiter.pic_len / args.batch_size), param.epoch, global_step[0], spend, left)
+            train_dataiter.print_info()
+
         _cb(param)
         global_step[0] += 1
-        mbatch = global_step[0]
-        for _lr in lr_steps:
-            if mbatch == _lr:
-                opt.lr *= 0.1
-                print('lr change to', opt.lr)
-                break
-        if mbatch % 1000 == 0:
-            print('lr-batch-epoch:', opt.lr, param.nbatch, param.epoch)
-        if mbatch == lr_steps[-1]:
-            arg, aux = model.get_params()
-            all_layers = model.symbol.get_internals()
-            _sym = all_layers['fc1_output']
-            mx.model.save_checkpoint(args.prefix, 0, _sym, arg, aux)
-            sys.exit(0)
 
-    epoch_cb = None
-    train_dataiter = mx.io.PrefetchingIter(train_dataiter)
-    print('start fitting')
+    def epoch_cb(epoch, symbol, arg, aux):
+        logging.info("================>epoch_cb epoch %s g_step %s args.lr_steps %s", epoch, global_step[0], args.lr_steps)
+        _lr_steps = [step - 1 for step in args.lr_steps]
+        for _lr in _lr_steps:
+            if epoch == _lr:
+                opt.lr *= 0.1
+                logging.info('lr change to %s', opt.lr)
+                break
+
+        logging.info('saving %s', epoch)
+        all_layers = model.symbol.get_internals()
+        _sym = all_layers['fc1_output']
+        mx.model.save_checkpoint(prefix + "/model", epoch, _sym, arg, aux)
+
+    # train_dataiter = mx.io.PrefetchingIter(train_dataiter)
+    logger.info('start fitting')
 
     model.fit(train_dataiter,
               begin_epoch=begin_epoch,
