@@ -521,8 +521,8 @@ class FaceDataset(mx.gluon.data.Dataset):
 
     def label_features(self):
         leveldb_feature_path = self.leveldb_feature_path
-        ret_features = nd.empty((self.label_len, 512))
-        if os.path.exists(leveldb_feature_path):
+        if leveldb_feature_path is not None and os.path.exists(leveldb_feature_path):
+            ret_features = nd.empty((self.label_len, 512))
             fea_db = leveldb.LevelDB(leveldb_feature_path, max_open_files=100)
             for batch_index, label in enumerate(self.order_labels):
                 if batch_index % 1000 == 0:
