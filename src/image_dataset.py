@@ -615,7 +615,7 @@ class FaceImageIter(io.DataIter):
             return
         self.data_queue = Queue(self.queue_size)
         self.seq = Queue(len(self.dataset))
-        # self.dataset.reset()
+        self.dataset.reset()
         batch_count = int(len(self.dataset) / self.batch_size)
         if self.shuffle:
             indexes = list(range(len(self.dataset)))

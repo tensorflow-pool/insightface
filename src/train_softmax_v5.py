@@ -679,11 +679,13 @@ def train_net(args):
         #
         if epoch == 0:
             dataset.max_images = 5
+            dataset.reset()
         if epoch == 1:
             dataset.max_images = 10
+            dataset.reset()
         if epoch == 2:
             dataset.max_images = 300
-        dataset.reset()
+            dataset.reset()
         # 下一个epoch才生效
         for index in range(epoch + 1, end_epoch):
             epoch_sizes[index] = int(dataset.pic_len / args.batch_size)
