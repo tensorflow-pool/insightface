@@ -725,7 +725,7 @@ class ListDataset(mx.gluon.data.Dataset):
                 self.alias_label[(index, l)] = self.glabal_label
                 self.glabal_label += 1
 
-    @property.setter
+    @max_images.setter
     def max_images(self, val):
         # 子集合暂不必重置
         for index, d in enumerate(self.dbs):
