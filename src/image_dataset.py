@@ -728,12 +728,6 @@ class ListDataset(mx.gluon.data.Dataset):
     def __len__(self):
         return self.data_len
 
-    def data_len(self):
-        return self.data_len
-
-    def label_len(self):
-        return self.label_len
-
     def __getitem__(self, idx):
         db = None
         db_index = 0

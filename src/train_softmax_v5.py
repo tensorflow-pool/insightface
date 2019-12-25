@@ -485,7 +485,7 @@ def train_net(args):
     label_path = os.path.expanduser("~/datasets/cacher/ms1m-retina.labels")
     dataset2 = FaceDataset(leveldb_path, label_path, min_images=10, max_images=300, ignore_labels={0})
     dataset = ListDataset(dataset1, dataset2)
-    logging.info("dataset %s/%s", dataset.label_len(), dataset.data_len())
+    logging.info("dataset %s/%s", dataset.label_len, dataset.data_len)
     train_dataiter = FaceImageIter(
         batch_size=args.batch_size,
         data_shape=data_shape,
