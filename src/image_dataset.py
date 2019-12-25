@@ -535,7 +535,8 @@ class FaceDataset(mx.gluon.data.Dataset):
                 except Exception as e:
                     logger.info("pic_id %s no pic", pic_id)
         else:
-            ret_features = nd.ones((self.label_len, 512)) * 0.2
+            ret_features = mx.nd.random.uniform(shape=(1, 512))
+            ret_features = ret_features / ret_features.norm() * 0.2
         return ret_features
 
     def before_next_label(self, label):
