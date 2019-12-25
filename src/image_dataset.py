@@ -725,6 +725,10 @@ class ListDataset(mx.gluon.data.Dataset):
                 self.alias_label[(index, l)] = self.glabal_label
                 self.glabal_label += 1
 
+    def reset(self):
+        # 子集合暂不必重置
+        pass
+
     def __len__(self):
         return self.data_len
 
