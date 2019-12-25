@@ -480,10 +480,10 @@ def train_net(args):
         args.gamma = 0.06
 
     data_shape = (args.image_channel, image_size[0], image_size[1])
-    dataset1 = FaceDataset(args.leveldb_path, args.label_path, min_images=10, max_images=300, ignore_labels={0})
+    dataset1 = FaceDataset(args.leveldb_path, args.label_path, min_images=10, max_images=10, ignore_labels={0})
     leveldb_path = os.path.expanduser("~/datasets/cacher/ms1m-retina")
     label_path = os.path.expanduser("~/datasets/cacher/ms1m-retina.labels")
-    dataset2 = FaceDataset(leveldb_path, label_path, min_images=10, max_images=300, ignore_labels={0})
+    dataset2 = FaceDataset(leveldb_path, label_path, min_images=10, max_images=10, ignore_labels={0})
     dataset = ListDataset(dataset1, dataset2)
     logging.info("dataset %s/%s", dataset.label_len, dataset.data_len)
     train_dataiter = FaceImageIter(
@@ -579,7 +579,7 @@ def train_net(args):
         lr_steps = [8, 12, 16]
         lr_steps = [2, 6, 10]
         lr_steps = [2, 6]
-        lr_steps = [3, 6, 9]
+        lr_steps = [6, 9, 12]
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
     if len(lr_steps) == 1:
@@ -675,15 +675,13 @@ def train_net(args):
         # 100 500w
         # 改变学习率的第一个epoch不变
         #
-        # if epoch == _lr_steps[-2] + 1:
-        #     dataset.max_images = 50
-        # if epoch == _lr_steps[-1] + 1:
-        #     dataset.max_images = 300
-        # dataset.reset()
-        # # 下一个epoch才生效
-        # for index in range(epoch + 1, end_epoch):
-        #     epoch_sizes[index] = int(dataset.pic_len / args.batch_size)
-        # args.max_steps = np.sum(epoch_sizes)
+        if epoch == 2:
+            dataset.max_images = 300
+        dataset.reset()
+        # 下一个epoch才生效
+        for index in range(epoch + 1, end_epoch):
+            epoch_sizes[index] = int(dataset.pic_len / args.batch_size)
+        args.max_steps = np.sum(epoch_sizes)
         logging.info("================>change max_images to %s epoch %s g_step %s max_steps %s epoch_sizes %s ", dataset.max_images, epoch, global_step[0], epoch_sizes, args.max_steps)
 
     # train_dataiter = mx.io.PrefetchingIter(train_dataiter)
