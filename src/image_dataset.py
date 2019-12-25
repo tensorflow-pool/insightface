@@ -23,7 +23,8 @@ logger = logging.getLogger()
 class FaceDataset(mx.gluon.data.Dataset):
     pic_db_dict = {}
 
-    def __init__(self, leveldb_path, label_path, pic_ignore=os.path.expanduser("~/datasets/cacher/picture.ignore"), min_images=0, max_images=11111111111, ignore_labels=set()):
+    def __init__(self, leveldb_path, label_path, leveldb_feature_path=None, pic_ignore=os.path.expanduser("~/datasets/cacher/picture.ignore"),
+                 min_images=0, max_images=11111111111, ignore_labels=set()):
         super(FaceDataset, self).__init__()
         assert leveldb_path
         logger.info('loading FaceDataset %s %s min_images %s max_images %s', leveldb_path, label_path, min_images, max_images)
@@ -31,6 +32,7 @@ class FaceDataset(mx.gluon.data.Dataset):
         self.label_path = label_path
         self.path_imgidx_filter = label_path + ".filter"
         self.path_label_merged = label_path + ".merged"
+        self.leveldb_feature_path = leveldb_feature_path
 
         self.ignore_pic_ids = set()
         if "processed" not in label_path and os.path.exists(pic_ignore):
@@ -517,7 +519,8 @@ class FaceDataset(mx.gluon.data.Dataset):
                 file.write(str(l))
                 file.write("\n")
 
-    def label_features(self, leveldb_feature_path):
+    def label_features(self):
+        leveldb_feature_path = self.leveldb_feature_path
         ret_features = nd.empty((self.label_len, 512))
         if os.path.exists(leveldb_feature_path):
             fea_db = leveldb.LevelDB(leveldb_feature_path, max_open_files=100)
@@ -531,6 +534,8 @@ class FaceDataset(mx.gluon.data.Dataset):
                     ret_features[batch_index][:] = np.frombuffer(data, dtype=np.float32)[:512] * 0.3
                 except Exception as e:
                     logger.info("pic_id %s no pic", pic_id)
+        else:
+            ret_features = nd.ones((self.label_len, 512)) * 0.2
         return ret_features
 
     def before_next_label(self, label):
@@ -763,6 +768,12 @@ class ListDataset(mx.gluon.data.Dataset):
         img, label_id, pic_id = db[db_index]
         alias = self.alias_label[(index, label_id)]
         return img, alias, pic_id
+
+    def label_features(self):
+        features = []
+        for db in self.dbs:
+            features.append(db.label_features())
+        return mx.nd.concat(*features, dim=0)
 
 
 if __name__ == '__main__':

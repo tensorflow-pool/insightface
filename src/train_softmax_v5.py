@@ -134,7 +134,7 @@ def parse_args():
     target = os.path.expanduser("~/datasets/maysa/lfw.bin")
     parser.add_argument('--target', type=str, default=target, help='verification targets')
 
-    parser.add_argument('--load_weight', type=int, default=0, help='重新加载feature')
+    parser.add_argument('--load_weight', type=int, default=1, help='重新加载feature')
     parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
     parser.add_argument('--per_batch_size', type=int, default=48, help='batch size in each context')
 
@@ -481,10 +481,10 @@ def train_net(args):
         args.gamma = 0.06
 
     data_shape = (args.image_channel, image_size[0], image_size[1])
-    dataset1 = FaceDataset(args.leveldb_path, args.label_path, min_images=10, max_images=1, ignore_labels={0})
+    dataset1 = FaceDataset(args.leveldb_path, args.label_path, leveldb_feature_path=os.path.expanduser("~/datasets/cacher/features"),  min_images=10, max_images=5, ignore_labels={0})
     leveldb_path = os.path.expanduser("~/datasets/cacher/ms1m-retina")
     label_path = os.path.expanduser("~/datasets/cacher/ms1m-retina.labels")
-    dataset2 = FaceDataset(leveldb_path, label_path, min_images=10, max_images=1, ignore_labels={0})
+    dataset2 = FaceDataset(leveldb_path, label_path, min_images=10, max_images=5, ignore_labels={0})
     dataset = ListDataset(dataset1, dataset2)
     logging.info("dataset %s/%s", dataset.label_len, dataset.data_len)
     train_dataiter = FaceImageIter(
@@ -516,8 +516,7 @@ def train_net(args):
         sym, arg_params, aux_params = mx.model.load_checkpoint(vec[0], int(vec[1]))
         logging.info("fc7_weight norm %s", mx.nd.norm(arg_params['fc7_weight'], axis=1).mean())
         if args.load_weight:
-            arg_params['fc7_weight'] = dataset.label_features(os.path.expanduser("~/datasets/cacher/features"))
-        del arg_params['fc7_weight']
+            arg_params['fc7_weight'] = dataset.label_features()
         sym, arg_params, aux_params = get_symbol(args, arg_params, aux_params)
 
     # label_name = 'softmax_label'
@@ -581,6 +580,7 @@ def train_net(args):
         lr_steps = [2, 6, 10]
         lr_steps = [2, 6]
         lr_steps = [6, 9, 12]
+        lr_steps = [5, 8, 11]
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
     if len(lr_steps) == 1:
@@ -678,12 +678,9 @@ def train_net(args):
         # 改变学习率的第一个epoch不变
         #
         if epoch == 0:
-            dataset.max_images = 5
-            dataset.reset()
-        if epoch == 1:
             dataset.max_images = 10
             dataset.reset()
-        if epoch == 2:
+        if epoch == 1:
             dataset.max_images = 300
             dataset.reset()
         # 下一个epoch才生效
