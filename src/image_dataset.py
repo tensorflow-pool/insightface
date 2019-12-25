@@ -712,18 +712,6 @@ class ListDataset(mx.gluon.data.Dataset):
     def __init__(self, *args):
         super(ListDataset, self).__init__()
         self.dbs = args
-        self.data_len = 0
-        self.label_len = 0
-        self.steps = []
-        self.glabal_label = 0
-        self.alias_label = {}
-        for index, d in enumerate(self.dbs):
-            self.data_len += len(d)
-            self.label_len += d.label_len
-            self.steps.append(self.data_len)
-            for l in range(d.label_len):
-                self.alias_label[(index, l)] = self.glabal_label
-                self.glabal_label += 1
 
     @property
     def max_images(self):
@@ -740,6 +728,18 @@ class ListDataset(mx.gluon.data.Dataset):
         # 子集合暂不必重置
         for index, d in enumerate(self.dbs):
             d.reset()
+        self.data_len = 0
+        self.label_len = 0
+        self.steps = []
+        self.glabal_label = 0
+        self.alias_label = {}
+        for index, d in enumerate(self.dbs):
+            self.data_len += len(d)
+            self.label_len += d.label_len
+            self.steps.append(self.data_len)
+            for l in range(d.label_len):
+                self.alias_label[(index, l)] = self.glabal_label
+                self.glabal_label += 1
 
     @property
     def pic_len(self):
