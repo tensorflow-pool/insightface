@@ -708,6 +708,48 @@ class FaceImageIter(io.DataIter):
         return nd.transpose(datum, axes=(2, 0, 1))
 
 
+class ListDataset(mx.gluon.data.Dataset):
+    def __init__(self, *args):
+        super(ListDataset, self).__init__()
+        self.dbs = args
+        self.data_len = 0
+        self.label_len = 0
+        self.steps = []
+        self.glabal_label = 0
+        self.alias_label = {}
+        for index, d in enumerate(self.dbs):
+            self.data_len += len(d)
+            self.label_len += d.label_len
+            self.steps.append(self.data_len)
+            for l in range(d.label_len):
+                self.alias_label[(index, l)] = self.glabal_label
+                self.glabal_label += 1
+
+    def __len__(self):
+        return self.data_len
+
+    def data_len(self):
+        return self.data_len
+
+    def label_len(self):
+        return self.label_len
+
+    def __getitem__(self, idx):
+        db = None
+        db_index = 0
+        last = 0
+        for index, step in enumerate(self.steps):
+            if idx < step:
+                db = self.dbs[index]
+                db_index = idx - last
+                break
+            last = step
+
+        img, label_id, pic_id = db[db_index]
+        alias = self.alias_label[(index, label_id)]
+        return img, alias, pic_id
+
+
 if __name__ == '__main__':
     from PIL import Image
 
