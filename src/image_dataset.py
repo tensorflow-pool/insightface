@@ -712,6 +712,7 @@ class ListDataset(mx.gluon.data.Dataset):
     def __init__(self, *args):
         super(ListDataset, self).__init__()
         self.dbs = args
+        self.reset()
 
     @property
     def max_images(self):
