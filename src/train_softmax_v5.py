@@ -480,10 +480,10 @@ def train_net(args):
         args.gamma = 0.06
 
     data_shape = (args.image_channel, image_size[0], image_size[1])
-    dataset1 = FaceDataset(args.leveldb_path, args.label_path, min_images=10, max_images=5, ignore_labels={0})
+    dataset1 = FaceDataset(args.leveldb_path, args.label_path, min_images=10, max_images=1, ignore_labels={0})
     leveldb_path = os.path.expanduser("~/datasets/cacher/ms1m-retina")
     label_path = os.path.expanduser("~/datasets/cacher/ms1m-retina.labels")
-    dataset2 = FaceDataset(leveldb_path, label_path, min_images=10, max_images=5, ignore_labels={0})
+    dataset2 = FaceDataset(leveldb_path, label_path, min_images=10, max_images=1, ignore_labels={0})
     dataset = ListDataset(dataset1, dataset2)
     logging.info("dataset %s/%s", dataset.label_len, dataset.data_len)
     train_dataiter = FaceImageIter(
@@ -676,9 +676,9 @@ def train_net(args):
         # 改变学习率的第一个epoch不变
         #
         if epoch == 0:
-            dataset.max_images = 10
+            dataset.max_images = 5
         if epoch == 1:
-            dataset.max_images = 20
+            dataset.max_images = 10
         if epoch == 2:
             dataset.max_images = 300
         dataset.reset()
