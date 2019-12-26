@@ -5,7 +5,6 @@ from __future__ import print_function
 import argparse
 import logging
 import os
-import sys
 import time
 
 import git
@@ -14,10 +13,9 @@ import mxnet.optimizer as optimizer
 import numpy as np
 from mxboard import SummaryWriter
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 'common'))
+import fmobilenet
 # import face_image
 import fresnet
-import fmobilenet
 from image_dataset import FaceDataset, FaceImageIter
 
 logger = logging.getLogger()
@@ -65,6 +63,7 @@ class LossValueMetric(mx.metric.EvalMetric):
         # print(gt_label)
 
 
+# 误差均值
 class MAEMetric(mx.metric.EvalMetric):
     def __init__(self):
         self.axis = 1
@@ -92,6 +91,7 @@ class MAEMetric(mx.metric.EvalMetric):
         self.num_inst += 1.0
 
 
+# 误差小于５的占比
 class CUMMetric(mx.metric.EvalMetric):
     def __init__(self, n=5):
         self.axis = 1
@@ -124,22 +124,28 @@ def parse_args():
     # general
     leveldb_path = os.path.expanduser("~/datasets/cacher/pictures")
     parser.add_argument('--leveldb_path', default=leveldb_path, help='training set directory')
-    label_path = os.path.expanduser("~/datasets/cacher/pictures.high.labels.37/left_pictures.labels.37.35_36.processed.v30.sex_age")
-    parser.add_argument('--label_path', default=label_path, help='training set directory')
 
-    parser.add_argument('--pretrained', default='', help='pretrained model to load')
+    train_path = os.path.expanduser("~/datasets/cacher/pictures.high.labels.37/left_pictures.labels.37.35_36.processed.v30.sex_age.val")
+    parser.add_argument('--train_path', default=train_path, help='training set directory')
+    val_path = os.path.expanduser("~/datasets/cacher/pictures.high.labels.37/left_pictures.labels.37.35_36.processed.v30.sex_age.test")
+    parser.add_argument('--val_path', default=val_path, help='training set directory')
+
+    # parser.add_argument('--pretrained', default='', help='pretrained model to load')
+    # parser.add_argument('--pretrained', default='./train/agesex_2019-12-26-14:52:14_back/model,0', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='./model/model,0', help='pretrained model to load')
 
     parser.add_argument('--lr', type=float, default=0.1, help='start learning rate')
     parser.add_argument('--lr_steps', type=str, default='4,8,12', help='steps of lr changing')
     parser.add_argument('--per_batch_size', type=int, default=32, help='batch size in each context')
 
     parser.add_argument('--max_steps', type=int, default=0, help='max training batches')
-    parser.add_argument('--network', default='r50', help='specify network')
+    # parser.add_argument('--network', default='r50', help='specify network')
+    parser.add_argument('--network', default='m14', help='specify network')
     parser.add_argument('--image_size', default='112,112', help='specify input image height and width')
     parser.add_argument('--version_input', type=int, default=1, help='network input config')
     parser.add_argument('--version_output', type=str, default='GAP', help='network embedding output config')
     parser.add_argument('--version_act', type=str, default='prelu', help='network activation config')
-    parser.add_argument('--multiplier', type=float, default=1.0, help='')
+    parser.add_argument('--multiplier', type=float, default=0.25, help='')
     parser.add_argument('--wd', type=float, default=0.0005, help='weight decay')
     parser.add_argument('--bn_mom', type=float, default=0.9, help='bn mom')
     parser.add_argument('--mom', type=float, default=0.9, help='momentum')
@@ -251,20 +257,40 @@ def train_net(args):
         context=ctx,
         symbol=sym,
     )
+    train_dataiter = None
+    end_epoch = 0
+    if args.train_path:
+        dataset = FaceDataset(leveldb_path=args.leveldb_path, label_path=args.train_path)
+        train_dataiter = FaceImageIter(
+            batch_size=args.batch_size,
+            data_shape=data_shape,
+            dataset=dataset,
+            shuffle=True,
+            gauss=False
+        )
 
-    dataset = FaceDataset(leveldb_path=args.leveldb_path, label_path=args.label_path)
-    train_dataiter = FaceImageIter(
-        batch_size=args.batch_size,
-        data_shape=data_shape,
-        dataset=dataset,
-        shuffle=True,
-        gauss=False
-    )
+        lr_steps = [int(x) for x in args.lr_steps.split(',')]
+        if len(lr_steps) == 1:
+            end_epoch = 2 * lr_steps[-1]
+        else:
+            end_epoch = 2 * lr_steps[-1] - lr_steps[-2]
+        epoch_sizes = [int(train_dataiter.pic_len / args.batch_size)] * end_epoch
+        args.max_steps = np.sum(epoch_sizes)
+        args.lr_steps = lr_steps
+        start_time = time.time()
+
     val_dataiter = None
-    # val_dataiter = FaceDataset(leveldb_path=args.leveldb_path, label_path=args.label_path)
+    if args.val_path:
+        val_dataset = FaceDataset(leveldb_path=args.leveldb_path, label_path=args.val_path)
+        val_dataiter = FaceImageIter(
+            batch_size=args.batch_size,
+            data_shape=data_shape,
+            dataset=val_dataset,
+            shuffle=False,
+            gauss=False
+        )
 
     metric = mx.metric.CompositeEvalMetric([AccMetric(), MAEMetric(), CUMMetric()])
-
     if args.network[0] == 'r' or args.network[0] == 'y':
         initializer = mx.init.Xavier(rnd_type='gaussian', factor_type="out", magnitude=2)  # resnet style
     elif args.network[0] == 'i' or args.network[0] == 'x':
@@ -277,16 +303,6 @@ def train_net(args):
     som = 20
     global_step = [0]
     _cb = mx.callback.Speedometer(args.batch_size, som)
-
-    lr_steps = [int(x) for x in args.lr_steps.split(',')]
-    if len(lr_steps) == 1:
-        end_epoch = 2 * lr_steps[-1]
-    else:
-        end_epoch = 2 * lr_steps[-1] - lr_steps[-2]
-    epoch_sizes = [int(train_dataiter.pic_len / args.batch_size)] * end_epoch
-    args.max_steps = np.sum(epoch_sizes)
-    args.lr_steps = lr_steps
-    start_time = time.time()
 
     def _batch_callback(param):
         nbatch = param.nbatch
@@ -329,23 +345,44 @@ def train_net(args):
         _sym = all_layers['fc1_output']
         mx.model.save_checkpoint(prefix + "/model", epoch, _sym, arg, aux)
 
+        res = model.score(val_dataiter, metric, num_batch=100, batch_end_callback=eval_batch_end_callback)
+        for name, val in res:
+            logger.info('Epoch[%d] Validation-%s=%f', epoch, name, val)
+
+    def eval_batch_end_callback(param):
+        nbatch = param.nbatch
+        if nbatch != 0 and nbatch % 20 == 0:
+            logging.info('eval_batch_end_callback nbatch/epoch_size %s/%s,  epoch %s',
+                         param.nbatch, int(val_dataiter.pic_len / args.batch_size), param.epoch)
+            val_dataiter.print_info()
+
     # train_dataiter = mx.io.PrefetchingIter(train_dataiter)
     logger.info('start fitting')
 
-    model.fit(train_dataiter,
-              begin_epoch=begin_epoch,
-              num_epoch=end_epoch,
-              eval_data=val_dataiter,
-              eval_metric=metric,
-              kvstore='device',
-              optimizer=opt,
-              # optimizer_params   = optimizer_params,
-              initializer=initializer,
-              arg_params=arg_params,
-              aux_params=aux_params,
-              allow_missing=True,
-              batch_end_callback=_batch_callback,
-              epoch_end_callback=epoch_cb)
+    if train_dataiter:
+        model.fit(train_dataiter,
+                  begin_epoch=begin_epoch,
+                  num_epoch=end_epoch,
+                  eval_data=None,
+                  eval_metric=metric,
+                  kvstore='device',
+                  optimizer=opt,
+                  # optimizer_params   = optimizer_params,
+                  initializer=initializer,
+                  arg_params=arg_params,
+                  aux_params=aux_params,
+                  allow_missing=True,
+                  batch_end_callback=_batch_callback,
+                  epoch_end_callback=epoch_cb,
+                  eval_batch_end_callback=eval_batch_end_callback)
+    else:
+        model.bind(data_shapes=val_dataiter.provide_data, label_shapes=val_dataiter.provide_label,
+                   for_training=False, force_rebind=False)
+        model.init_params(initializer=initializer, arg_params=arg_params, aux_params=aux_params,
+                          allow_missing=True, force_init=False)
+        res = model.score(val_dataiter, metric, num_batch=None, batch_end_callback=eval_batch_end_callback)
+        for name, val in res:
+            logger.info('Epoch[%d] Validation-%s=%f', 0, name, val)
 
 
 def main():
