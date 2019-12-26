@@ -37,17 +37,26 @@ class FaceDataset(mx.gluon.data.Dataset):
         with open(self.label_path, "r") as file:
             lines = file.readlines()
             self.pic_ids = []
-            self.pic2agesex = {}
+            self.pic2label = {}
             for index, line in enumerate(lines):
                 # if index > 3200:
                 #     break
-                pic_id, sex, age = line.strip().split(",")
+                item = line.strip().split(",")
+                if len(item) == 2:
+                    pic_id, quality = item
+                    sex, age = -1, -1
+                elif len(item) == 3:
+                    pic_id, sex, age = item
+                    quality = -1
+                elif len(item) == 4:
+                    pic_id, sex, age, quality = item
                 self.pic_ids.append(pic_id)
                 sex = int(sex)
                 age = int(age)
-                self.pic2agesex[pic_id] = [sex, age]
+                quality = int(quality)
+                self.pic2label[pic_id] = [sex, age, quality]
 
-        logger.info("final pic_ids %s labels %s", len(self.pic_ids), len(self.pic2agesex))
+        logger.info("final pic_ids %s labels %s", len(self.pic_ids), len(self.pic2label))
 
     @property
     def pic_len(self):
@@ -59,12 +68,12 @@ class FaceDataset(mx.gluon.data.Dataset):
     def __getitem__(self, idx):
         if idx < len(self.pic_ids):
             pic_id = self.pic_ids[idx]
-            sex, age = self.pic2agesex[pic_id]
+            sex, age, quality = self.pic2label[pic_id]
             try:
                 pic_id = str(pic_id).encode('utf-8')
                 data = self.pic_db.Get(pic_id)
                 img = mx.image.imdecode(data)
-                return img, sex, age, pic_id
+                return img, sex, age, quality, pic_id
             except Exception as e:
                 logger.info("pic_id %s no pic", pic_id)
         else:
@@ -82,7 +91,7 @@ class FaceDataset(mx.gluon.data.Dataset):
 
 
 class FaceImageIter(io.DataIter):
-    def __init__(self, batch_size, data_shape, dataset, shuffle=False, gauss=False, rand_mirror=False, data_name='data', label_name='softmax_label', queue_size=64):
+    def __init__(self, batch_size, data_shape, dataset, lable_size=102, shuffle=False, gauss=False, rand_mirror=False, data_name='data', label_name='softmax_label', queue_size=64):
         super(FaceImageIter, self).__init__()
         self.check_data_shape(data_shape)
         self.provide_data = [(data_name, (batch_size,) + data_shape)]
@@ -92,7 +101,8 @@ class FaceImageIter(io.DataIter):
         self.rand_mirror = rand_mirror
         self.gauss = gauss
         self.image_size = '%d,%d' % (data_shape[1], data_shape[2])
-        self.provide_label = [(label_name, (batch_size, 101))]
+        self.provide_label = [(label_name, (batch_size, lable_size))]
+        self.lable_size = lable_size
         # print(self.provide_label[0][1])
 
         self.dataset = dataset
@@ -150,7 +160,7 @@ class FaceImageIter(io.DataIter):
         if self.seq.qsize() > 0:
             indexes = self.seq.get()
             for i, idx in enumerate(indexes):
-                _data, sex, age, pic_id = self.dataset[idx]
+                _data, sex, age, quality, pic_id = self.dataset[idx]
                 # label, _data, bbox, landmark = self.seq.get()
                 if _data.shape[0] != self.data_shape[1]:
                     _data = mx.image.resize_short(_data, self.data_shape[1])
@@ -171,13 +181,17 @@ class FaceImageIter(io.DataIter):
                     continue
                 for datum in data:
                     batch_data[i][:] = self.postprocess_data(datum)
-                    plabel = np.zeros(shape=(101,), dtype=np.float32)
+                    plabel = np.zeros(shape=(self.lable_size,), dtype=np.float32)
                     plabel[0] = sex
-                    if age == 0:
-                        age = 1
-                    if age > 100:
-                        age = 100
-                    plabel[1:age + 1] = 1
+                    if age == -1:
+                        plabel[1:age + 1] = -1
+                    else:
+                        if age == 0:
+                            age = 1
+                        if age > 100:
+                            age = 100
+                        plabel[1:age + 1] = 1
+                    plabel[-1] = quality
                     batch_label[i][:] = plabel
             return io.DataBatch([batch_data], [batch_label], batch_size - i)
         else:

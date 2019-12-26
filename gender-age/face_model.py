@@ -39,6 +39,15 @@ class FaceModel:
         # self.det_factor = 0.9
         self.image_size = image_size
 
+    def softmax(self, x):
+        x_row_max = x.max(axis=-1)
+        x_row_max = x_row_max.reshape(list(x.shape)[:-1] + [1])
+        x = x - x_row_max
+        x_exp = np.exp(x)
+        x_exp_row_sum = x_exp.sum(axis=-1).reshape(list(x.shape)[:-1] + [1])
+        softmax = x_exp / x_exp_row_sum
+        return softmax
+
     def get_ga(self, face_imgs):
         batch_imags = []
         for face_img in face_imgs:
@@ -52,7 +61,17 @@ class FaceModel:
         ret = self.model.get_outputs()[0].asnumpy()
         g = ret[:, 0:2]
         genders = np.argmax(g, axis=-1)
+        pro = self.softmax(g)
+        pro = pro[np.arange(len(pro)), genders]
+
         a = ret[:, 2:202].reshape((-1, 100, 2))
         a = np.argmax(a, axis=-1)
         ages = a.sum(axis=-1)
-        return genders, ages
+
+        if ret.shape[-1] == 204:
+            quality = ret[:, 202:]
+            quality = self.softmax(quality)
+            quality = quality[:, 1].reshape(len(face_imgs))
+        else:
+            quality = np.ones(len(face_imgs))
+        return genders, pro, ages, quality

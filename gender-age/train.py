@@ -27,24 +27,33 @@ args = None
 
 
 class AccMetric(mx.metric.EvalMetric):
-    def __init__(self):
+    def __init__(self, name, index):
         self.axis = 1
-        super(AccMetric, self).__init__(
-            'acc', axis=self.axis,
-            output_names=None, label_names=None)
+        super(AccMetric, self).__init__(name, axis=self.axis, output_names=None, label_names=None)
         self.losses = []
         self.count = 0
+        self.index = index
 
     def update(self, labels, preds):
         self.count += 1
-        label = labels[0].asnumpy()[:, 0:1]
-        pred_label = preds[-1].asnumpy()[:, 0:2]
+        label = labels[0].asnumpy()[:, self.index:self.index + 1]
+        pred_label = preds[-1].asnumpy()[:, self.index * 2:(self.index + 1) * 2]
         pred_label = np.argmax(pred_label, axis=self.axis)
         pred_label = pred_label.astype('int32').flatten()
         label = label.astype('int32').flatten()
         assert label.shape == pred_label.shape
         self.sum_metric += (pred_label.flat == label.flat).sum()
         self.num_inst += len(pred_label.flat)
+
+
+class GenderAccMetric(AccMetric):
+    def __init__(self):
+        super(GenderAccMetric, self).__init__('gender_acc', 0)
+
+
+class QualityAccMetric(AccMetric):
+    def __init__(self):
+        super(QualityAccMetric, self).__init__('quality_acc', 101)
 
 
 class LossValueMetric(mx.metric.EvalMetric):
@@ -126,17 +135,20 @@ def parse_args():
     parser.add_argument('--leveldb_path', default=leveldb_path, help='training set directory')
 
     train_path = os.path.expanduser("~/datasets/cacher/pictures.high.labels.37/left_pictures.labels.37.35_36.processed.v30.sex_age.val")
+    # train_path = os.path.expanduser("~/datasets/cacher/quality.labels.train")
     parser.add_argument('--train_path', default=train_path, help='training set directory')
     val_path = os.path.expanduser("~/datasets/cacher/pictures.high.labels.37/left_pictures.labels.37.35_36.processed.v30.sex_age.test")
+    # val_path = os.path.expanduser("~/datasets/cacher/quality.labels.val")
     parser.add_argument('--val_path', default=val_path, help='training set directory')
 
-    # parser.add_argument('--pretrained', default='', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='', help='pretrained model to load')
+    # parser.add_argument('--pretrained', default='./model/model,0', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/agesex_2019-12-26-14:52:14_back/model,0', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='./model/model,0', help='pretrained model to load')
+    # parser.add_argument('--pretrained', default='./train/agesex_2019-12-26-16:16:09_back/model,1', help='pretrained model to load')
 
     parser.add_argument('--lr', type=float, default=0.1, help='start learning rate')
     parser.add_argument('--lr_steps', type=str, default='4,8,12', help='steps of lr changing')
-    parser.add_argument('--per_batch_size', type=int, default=32, help='batch size in each context')
+    parser.add_argument('--per_batch_size', type=int, default=64, help='batch size in each context')
 
     parser.add_argument('--max_steps', type=int, default=0, help='max training batches')
     # parser.add_argument('--network', default='r50', help='specify network')
@@ -162,30 +174,38 @@ def get_symbol(args, arg_params, aux_params):
     image_shape = ",".join([str(x) for x in data_shape])
     margin_symbols = []
     if args.network[0] == 'm':
-        fc1 = fmobilenet.get_symbol(AGE * 2 + 2,
+        fc1 = fmobilenet.get_symbol(2 + AGE * 2 + 2,
                                     multiplier=args.multiplier,
                                     version_input=args.version_input,
                                     version_output=args.version_output)
     else:
-        fc1 = fresnet.get_symbol(AGE * 2 + 2, args.num_layers,
+        fc1 = fresnet.get_symbol(2 + AGE * 2 + 2, args.num_layers,
                                  version_input=args.version_input,
                                  version_output=args.version_output)
     label = mx.symbol.Variable('softmax_label')
+
     gender_label = mx.symbol.slice_axis(data=label, axis=1, begin=0, end=1)
     gender_label = mx.symbol.reshape(gender_label, shape=(args.per_batch_size,))
     gender_fc1 = mx.symbol.slice_axis(data=fc1, axis=1, begin=0, end=2)
-    # gender_fc7 = mx.sym.FullyConnected(data=gender_fc1, num_hidden=2, name='gender_fc7')
     gender_softmax = mx.symbol.SoftmaxOutput(data=gender_fc1, label=gender_label, name='gender_softmax',
-                                             normalization='valid', use_ignore=True, ignore_label=9999)
+                                             normalization='valid', use_ignore=True, ignore_label=-1)
     outs = [gender_softmax]
+
     for i in range(AGE):
         age_label = mx.symbol.slice_axis(data=label, axis=1, begin=i + 1, end=i + 2)
         age_label = mx.symbol.reshape(age_label, shape=(args.per_batch_size,))
         age_fc1 = mx.symbol.slice_axis(data=fc1, axis=1, begin=2 + i * 2, end=4 + i * 2)
         # age_fc7 = mx.sym.FullyConnected(data=age_fc1, num_hidden=2, name='age_fc7_%i'%i)
         age_softmax = mx.symbol.SoftmaxOutput(data=age_fc1, label=age_label, name='age_softmax_%d' % i,
-                                              normalization='valid', grad_scale=1)
+                                              normalization='valid', use_ignore=True, ignore_label=-1, grad_scale=1)
         outs.append(age_softmax)
+
+    quality_label = mx.symbol.slice_axis(data=label, axis=1, begin=-1, end=None)
+    quality_label = mx.symbol.reshape(quality_label, shape=(args.per_batch_size,))
+    quality_fc1 = mx.symbol.slice_axis(data=fc1, axis=1, begin=-2, end=None)
+    quality_softmax = mx.symbol.SoftmaxOutput(data=quality_fc1, label=quality_label, name='quality_softmax',
+                                              normalization='valid', use_ignore=True, ignore_label=-1)
+    outs.append(quality_softmax)
     outs.append(mx.sym.BlockGrad(fc1))
 
     out = mx.symbol.Group(outs)
@@ -290,7 +310,7 @@ def train_net(args):
             gauss=False
         )
 
-    metric = mx.metric.CompositeEvalMetric([AccMetric(), MAEMetric(), CUMMetric()])
+    metric = mx.metric.CompositeEvalMetric([GenderAccMetric(), MAEMetric(), CUMMetric(), QualityAccMetric()])
     if args.network[0] == 'r' or args.network[0] == 'y':
         initializer = mx.init.Xavier(rnd_type='gaussian', factor_type="out", magnitude=2)  # resnet style
     elif args.network[0] == 'i' or args.network[0] == 'x':
@@ -312,11 +332,13 @@ def train_net(args):
             sex_acc = param.eval_metric.get_name_value()[0][1]
             age_acc = param.eval_metric.get_name_value()[1][1]
             age_cum = param.eval_metric.get_name_value()[2][1]
+            quality_acc = param.eval_metric.get_name_value()[3][1]
 
             sw.add_scalar(tag='lr', value=opt.lr, global_step=global_batch)
             sw.add_scalar(tag='sex_acc', value=sex_acc, global_step=global_batch)
             sw.add_scalar(tag='age_acc', value=age_acc, global_step=global_batch)
             sw.add_scalar(tag='age_cum', value=age_cum, global_step=global_batch)
+            sw.add_scalar(tag='quality_acc', value=quality_acc, global_step=global_batch)
 
             spend = (time.time() - start_time) / 3600
             if global_batch == 0:
