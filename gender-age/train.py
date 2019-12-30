@@ -131,10 +131,10 @@ class CUMMetric(mx.metric.EvalMetric):
 def parse_args():
     parser = argparse.ArgumentParser(description='Train face network')
     # general
-    leveldb_path = os.path.expanduser("~/datasets/cacher/pictures")
+    leveldb_path = os.path.expanduser("/vdb/cacher/pictures")
     parser.add_argument('--leveldb_path', default=leveldb_path, help='training set directory')
 
-    train_path = os.path.expanduser("~/datasets/cacher/pictures.high.labels.37/left_pictures.labels.37.35_36.processed.v30.sex_age.traii")
+    train_path = os.path.expanduser("~/datasets/cacher/pictures.high.labels.37/left_pictures.labels.37.35_36.processed.v30.sex_age.train")
     # train_path = os.path.expanduser("~/datasets/cacher/quality.labels.train")
     parser.add_argument('--train_path', default=train_path, help='training set directory')
     val_path = os.path.expanduser("~/datasets/cacher/pictures.high.labels.37/left_pictures.labels.37.35_36.processed.v30.sex_age.val")
