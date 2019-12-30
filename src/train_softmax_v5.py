@@ -157,7 +157,7 @@ def parse_args():
     parser.add_argument('--image-size', default='112,112', help='specify input image height and width')
     parser.add_argument('--version-se', type=int, default=0, help='whether to use se in network')
     parser.add_argument('--version-input', type=int, default=1, help='network input config 1代表第一次卷积7x7-2改为3x3-1')
-    parser.add_argument('--version-output', type=str, default='E', help='network embedding output config e代表的是bn-drop-fc-bn结构')
+    parser.add_argument('--version_output', type=str, default='E', help='network embedding output config e代表的是bn-drop-fc-bn结构')
     parser.add_argument('--version-unit', type=int, default=3, help='resnet unit config 3代表的是arc论文中对残差网络单元的修改，增加了更多bn和prelu')
     parser.add_argument('--version-multiplier', type=float, default=1.0, help='filters multiplier')
     parser.add_argument('--version-act', type=str, default='prelu', help='network activation config')

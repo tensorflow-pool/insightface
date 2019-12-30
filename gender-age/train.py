@@ -134,10 +134,10 @@ def parse_args():
     leveldb_path = os.path.expanduser("~/datasets/cacher/pictures")
     parser.add_argument('--leveldb_path', default=leveldb_path, help='training set directory')
 
-    train_path = os.path.expanduser("~/datasets/cacher/pictures.high.labels.37/left_pictures.labels.37.35_36.processed.v30.sex_age.val")
+    train_path = os.path.expanduser("~/datasets/cacher/pictures.high.labels.37/left_pictures.labels.37.35_36.processed.v30.sex_age.traii")
     # train_path = os.path.expanduser("~/datasets/cacher/quality.labels.train")
     parser.add_argument('--train_path', default=train_path, help='training set directory')
-    val_path = os.path.expanduser("~/datasets/cacher/pictures.high.labels.37/left_pictures.labels.37.35_36.processed.v30.sex_age.test")
+    val_path = os.path.expanduser("~/datasets/cacher/pictures.high.labels.37/left_pictures.labels.37.35_36.processed.v30.sex_age.val")
     # val_path = os.path.expanduser("~/datasets/cacher/quality.labels.val")
     parser.add_argument('--val_path', default=val_path, help='training set directory')
 
@@ -148,7 +148,7 @@ def parse_args():
 
     parser.add_argument('--lr', type=float, default=0.1, help='start learning rate')
     parser.add_argument('--lr_steps', type=str, default='4,8,12', help='steps of lr changing')
-    parser.add_argument('--per_batch_size', type=int, default=64, help='batch size in each context')
+    parser.add_argument('--per_batch_size', type=int, default=128, help='batch size in each context')
 
     parser.add_argument('--max_steps', type=int, default=0, help='max training batches')
     # parser.add_argument('--network', default='r50', help='specify network')
