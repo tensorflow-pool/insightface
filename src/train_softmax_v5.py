@@ -583,6 +583,7 @@ def train_net(args):
         lr_steps = [2, 6]
         lr_steps = [6, 9, 12]
         lr_steps = [5, 8, 11]
+        lr_steps = [1]
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
     if len(lr_steps) == 1:
@@ -597,6 +598,31 @@ def train_net(args):
 
     cos_ts = []
 
+    def cal_noise(cos_t_cur, nbatch):
+        # cos_t_cur.sort()
+        # n2 = np.zeros_like(cos_t_cur)
+        # for index in range(len(n2)):
+        #     start = max(0, index - 2)
+        #     end = min(len(n2), index + 2)
+        #     n2[index] = np.mean(cos_t_cur[start:end])
+        # bin_dict = {}
+        # for b in range(1000):
+        #     bin_dict[b / 1000] = 0
+        # for n in n2:
+        #     n = int(n * 1000) / 1000
+        #     if n == 1:
+        #         n == 0.999
+        #     bin_dict[n] += 1
+        # logging.info("bin_dict %s", bin_dict)
+
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(20, 8))
+        ###绘图
+        plt.hist(cos_t_cur, bins=1000, color='g')
+        plt.title('余弦直方图')
+        ###保存
+        plt.savefig("{}/plt_{}.jpg".format(file_path, nbatch))
+
     def _batch_callback(param):
         nbatch = param.nbatch
         global_batch = global_step[0]
@@ -604,9 +630,13 @@ def train_net(args):
         cos_t = model.get_outputs()[4].asnumpy()
         cos_ts.append(cos_t)
         # logging.info("cos_t %s ", cos_t)
-        if nbatch % 100:
+        if nbatch % 1000 == 0:
             cos_t_cur = np.concatenate(cos_ts)
-            sw.add_histogram(tag="cos_t", values=cos_t_cur, global_step=global_batch, bins=100)
+            # bins = list(range(100))
+            # bins = [b / 100 for b in bins]
+            bins = 1000
+            sw.add_histogram(tag="cos_t", values=cos_t_cur, global_step=global_batch, bins=bins)
+            cal_noise(cos_t_cur, nbatch)
 
         if nbatch != 0 and nbatch % 20 == 0:
             acc = param.eval_metric.get_name_value()[0][1]
