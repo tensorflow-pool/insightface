@@ -483,7 +483,7 @@ def train_net(args):
         args.gamma = 0.06
 
     data_shape = (args.image_channel, image_size[0], image_size[1])
-    dataset = FaceDataset(args.leveldb_path, args.label_path, leveldb_feature_path=os.path.expanduser("~/datasets/cacher/features"), min_images=10, max_images=5, ignore_labels={0})
+    dataset = FaceDataset(args.leveldb_path, args.label_path, leveldb_feature_path=os.path.expanduser("~/datasets/cacher/features"), min_images=10, max_images=3000000, ignore_labels={0})
     # leveldb_path = os.path.expanduser("~/datasets/cacher/ms1m-retina")
     # label_path = os.path.expanduser("~/datasets/cacher/ms1m-retina.labels")
     # dataset2 = FaceDataset(leveldb_path, label_path, min_images=10, max_images=5, ignore_labels={0})
