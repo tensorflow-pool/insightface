@@ -598,14 +598,14 @@ def train_net(args):
 
         if nbatch != 0 and nbatch % 20 == 0:
             acc = param.eval_metric.get_name_value()[0][1]
-            loss = param.eval_metric.get_name_value()[1][1]
-            real_acc = param.eval_metric.get_name_value()[2][1]
+            real_acc = param.eval_metric.get_name_value()[1][1]
+            loss = param.eval_metric.get_name_value()[2][1]
             real_loss = param.eval_metric.get_name_value()[3][1]
 
             sw.add_scalar(tag='lr', value=opt.lr, global_step=global_batch)
             sw.add_scalar(tag='acc', value=acc, global_step=global_batch)
-            sw.add_scalar(tag='loss', value=loss, global_step=global_batch)
             sw.add_scalar(tag='real_acc', value=real_acc, global_step=global_batch)
+            sw.add_scalar(tag='loss', value=loss, global_step=global_batch)
             sw.add_scalar(tag='real_loss', value=real_loss, global_step=global_batch)
 
             softmax = model.get_outputs()[1].asnumpy()
