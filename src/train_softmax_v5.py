@@ -13,10 +13,11 @@ import mxnet as mx
 import mxnet.optimizer as optimizer
 import numpy as np
 
-from image_dataset import FaceImageIter, FaceDataset, ListDataset
+from image_dataset import FaceImageIter, FaceDataset
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'common'))
 import git
+
 sys.path.append(os.path.join(os.path.dirname(__file__), 'eval'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'symbols'))
 import fresnet
@@ -134,8 +135,8 @@ def parse_args():
     target = os.path.expanduser("~/datasets/maysa/lfw.bin")
     parser.add_argument('--target', type=str, default=target, help='verification targets')
 
-    parser.add_argument('--load_weight', type=int, default=1, help='重新加载feature')
-    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
+    parser.add_argument('--load_weight', type=int, default=0, help='重新加载feature')
+    parser.add_argument('--lr', type=float, default=0.00001, help='start learning rate')
     parser.add_argument('--per_batch_size', type=int, default=48, help='batch size in each context')
 
     parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
@@ -418,6 +419,7 @@ def get_symbol(args, arg_params, aux_params):
     out_list.append(softmax)
     out_list.append(mx.symbol.BlockGrad(mx.symbol.softmax(origin_fc7)))
     out_list.append(mx.symbol.BlockGrad(origin_t))
+    out_list.append(mx.symbol.BlockGrad(cos_t))
     if args.loss_type == 6:
         out_list.append(intra_loss)
     if args.loss_type == 7:
@@ -481,11 +483,11 @@ def train_net(args):
         args.gamma = 0.06
 
     data_shape = (args.image_channel, image_size[0], image_size[1])
-    dataset1 = FaceDataset(args.leveldb_path, args.label_path, leveldb_feature_path=os.path.expanduser("~/datasets/cacher/features"),  min_images=10, max_images=5, ignore_labels={0})
-    leveldb_path = os.path.expanduser("~/datasets/cacher/ms1m-retina")
-    label_path = os.path.expanduser("~/datasets/cacher/ms1m-retina.labels")
-    dataset2 = FaceDataset(leveldb_path, label_path, min_images=10, max_images=5, ignore_labels={0})
-    dataset = ListDataset(dataset1, dataset2)
+    dataset = FaceDataset(args.leveldb_path, args.label_path, leveldb_feature_path=os.path.expanduser("~/datasets/cacher/features"), min_images=10, max_images=5, ignore_labels={0})
+    # leveldb_path = os.path.expanduser("~/datasets/cacher/ms1m-retina")
+    # label_path = os.path.expanduser("~/datasets/cacher/ms1m-retina.labels")
+    # dataset2 = FaceDataset(leveldb_path, label_path, min_images=10, max_images=5, ignore_labels={0})
+    # dataset = ListDataset(dataset1, dataset2)
     logging.info("dataset %s/%s", dataset.label_len, dataset.data_len)
     train_dataiter = FaceImageIter(
         batch_size=args.batch_size,
@@ -587,14 +589,24 @@ def train_net(args):
         end_epoch = 2 * lr_steps[-1]
     else:
         end_epoch = 2 * lr_steps[-1] - lr_steps[-2]
+    end_epoch = 1
     epoch_sizes = [int(dataset.pic_len / args.batch_size)] * end_epoch
     args.max_steps = np.sum(epoch_sizes)
     args.lr_steps = lr_steps
     start_time = time.time()
 
+    cos_ts = []
+
     def _batch_callback(param):
         nbatch = param.nbatch
         global_batch = global_step[0]
+
+        cos_t = model.get_outputs()[4].asnumpy()
+        cos_ts.append(cos_t)
+        # logging.info("cos_t %s ", cos_t)
+        if nbatch % 100:
+            cos_t_cur = np.concatenate(cos_ts)
+            sw.add_histogram(tag="cos_t", values=cos_t_cur, global_step=global_batch, bins=100)
 
         if nbatch != 0 and nbatch % 20 == 0:
             acc = param.eval_metric.get_name_value()[0][1]

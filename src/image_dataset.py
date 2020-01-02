@@ -558,6 +558,10 @@ class FaceDataset(mx.gluon.data.Dataset):
         return len(self.pic_ids)
 
     @property
+    def data_len(self):
+        return len(self.pic_ids)
+    
+    @property
     def label_len(self):
         return len(self.label2pic)
 
