@@ -37,6 +37,7 @@ from mxboard import SummaryWriter
 
 args = None
 
+cos_ts = []
 
 class AccMetric(mx.metric.EvalMetric):
     def __init__(self, real=False):
@@ -140,7 +141,7 @@ def parse_args():
     parser.add_argument('--target', type=str, default=target, help='verification targets')
 
     parser.add_argument('--load_weight', type=int, default=0, help='重新加载feature')
-    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
+    parser.add_argument('--lr', type=float, default=0.001, help='start learning rate')
     parser.add_argument('--per_batch_size', type=int, default=64, help='batch size in each context')
 
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
@@ -154,7 +155,7 @@ def parse_args():
     # parser.add_argument('--pretrained', default='./train/v26_2019-12-20-17:26:24/model,9', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/v28_2019-12-25-10:26:16/model,2', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/model-r34-amf/model,0', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='./train/noise_2020-01-03-14:04:50/model,0', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='./train/noise_2020-01-03-16:22:34/model,2', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='', help='pretrained model to load')
 
     parser.add_argument('--network', default='y2', help='specify network')
@@ -444,6 +445,8 @@ def get_symbol(args, arg_params, aux_params):
     return (out, arg_params, aux_params)
 
 
+
+
 def train_net(args):
     branch_name = git.Repo("..").active_branch.name
     prefix = time.strftime("%Y-%m-%d-%H:%M:%S")
@@ -597,8 +600,6 @@ def train_net(args):
     args.lr_steps = lr_steps
     start_time = time.time()
 
-    cos_ts = []
-
     def save_png(cos_t_cur, end_str):
         import matplotlib.pyplot as plt
         plt.figure(figsize=(20, 8))
@@ -624,38 +625,36 @@ def train_net(args):
         sigm_r = n2[-sigm_l_th]
         logging.info("sigm_l %s sigm_r %s", sigm_l, sigm_r)
 
-        bins = 1000
+        bins = 100
         bin_dict = defaultdict(int)
         for n in n2:
-            if n < 0 or n > 1:
-                continue
-            n = int(n * 1000)
+            n = int(n * bins)
             if n == bins:
                 n == bins - 1
             bin_dict[n] += 1
 
-        n2 = np.zeros(bins)
-        for index in range(bins):
-            n2[index] = bin_dict[index]
+        n2 = np.zeros(bins * 2)
+        for index in range(bins * 2):
+            n2[index] = bin_dict[index - bins]
         n2_copy = n2.copy()
-        for index in range(bins):
+        for index in range(bins * 2):
             start = max(0, index - 2)
-            end = min(bins, index + 2)
+            end = min(bins * 2, index + 2)
             n2[index] = np.mean(n2_copy[start:end])
 
         save_mean_png(n2, end_str)
         max_thes = []
         max_counts = []
-        for th in range(bins):
-            if 5 <= th <= bins - 6:
+        for th in range(bins * 2):
+            if 5 <= th <= bins * 2 - 6:
                 is_max = True
                 for i in range(11):
-                    cur = bin_dict[th - 5 + i]
-                    if cur == 0 or cur > bin_dict[th]:
+                    cur = n2[th - 5 + i]
+                    if cur == 0 or cur > n2[th]:
                         is_max = False
                         break
                 if is_max:
-                    max_thes.append(th * 0.001)
+                    max_thes.append((th - bins) * 0.01)
                     max_counts.append(n2[th])
         logging.info("max_thes %s max_counts %s", max_thes, max_counts)
 
@@ -677,10 +676,10 @@ def train_net(args):
         cos_ts.append(cos_t)
         # logging.info("cos_t %s ", cos_t)
         if global_batch % 1000 == 0:
-            cos_t_cur = np.concatenate(cos_ts)
+            cos_t_cur = np.concatenate(cos_ts[-1000:])
             # bins = list(range(100))
             # bins = [b / 100 for b in bins]
-            bins = 1000
+            bins = 100
             sw.add_histogram(tag="cos_t", values=cos_t_cur, global_step=global_batch, bins=bins)
             cal_noise(cos_t_cur, global_batch)
 
@@ -735,10 +734,11 @@ def train_net(args):
         global_step[0] += 1
 
     def epoch_cb(epoch, symbol, arg, aux):
+        global cos_ts
         # 清理历史列表
         cos_t_all = np.concatenate(cos_ts)
         cal_noise_end(cos_t_all, epoch)
-        cos_ts.clear()
+        cos_ts = cos_ts[-1000:]
         logging.info("================>epoch_cb epoch %s g_step %s args.lr_steps %s", epoch, global_step[0], args.lr_steps)
         _lr_steps = [step - 1 for step in args.lr_steps]
         for _lr in _lr_steps:
