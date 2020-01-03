@@ -119,7 +119,8 @@ class LossValueMetric(mx.metric.EvalMetric):
 def parse_args():
     parser = argparse.ArgumentParser(description='Train face network')
 
-    leveldb_path = os.path.expanduser("~/datasets/cacher/pictures")
+    # leveldb_path = os.path.expanduser("~/datasets/cacher/pictures")
+    leveldb_path = os.path.expanduser("/opt/cacher/faces_webface_112x112")
     parser.add_argument('--leveldb_path', default=leveldb_path, help='training set directory')
     # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.05_30")
     # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.38_39")
@@ -130,18 +131,19 @@ def parse_args():
     # 0.5合并的，并再次处理了剩余的(现在都清理了白鹭郡测试数据)
     # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.48/left_pictures.labels.48.46_47")
     # 0.6合并的,并且合并了剩余的，并踢出了0.5merge的(现在都清理了白鹭郡等所有测试数据)
-    label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.35/left_pictures.labels.35.33_34.processed.v16")
+
+    # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.35/left_pictures.labels.35.33_34.processed.v16")
+    label_path = os.path.expanduser("/opt/cacher/faces_webface_112x112.labels")
     parser.add_argument('--label_path', default=label_path, help='training set directory')
     target = os.path.expanduser("~/datasets/maysa/lfw.bin")
     parser.add_argument('--target', type=str, default=target, help='verification targets')
 
-    parser.add_argument('--load_weight', type=int, default=0, help='重新加载feature')
-    parser.add_argument('--lr', type=float, default=0.00001, help='start learning rate')
+    parser.add_argument('--load_weight', type=int, default=1, help='重新加载feature')
+    parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
     parser.add_argument('--per_batch_size', type=int, default=48, help='batch size in each context')
 
-    parser.add_argument('--prefix', default='../model-output', help='directory to save model.')
+
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
-    # parser.add_argument('--pretrained', default='../models/model-r34-amf/model,0', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models/model-r34-7-19/model,172000', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models/r100-iccv/model,1', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models_retina100_2019-10-18/model,486201', help='pretrained model to load')
@@ -149,12 +151,16 @@ def parse_args():
     # parser.add_argument('--pretrained', default='./train/models_2019-12-05-21:08:10/model,70060', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/models_2019-12-12-23:04:29/model,9', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/v26_2019-12-18-21:18:18/model,4', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='./train/v26_2019-12-20-17:26:24/model,9', help='pretrained model to load')
+    # parser.add_argument('--pretrained', default='./train/v26_2019-12-20-17:26:24/model,9', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/v28_2019-12-25-10:26:16/model,2', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='./train/model-r34-amf/model,0', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='', help='pretrained model to load')
+
+    parser.add_argument('--network', default='r34', help='specify network')
+    parser.add_argument('--emb-size', type=int, default=512, help='embedding length')
     parser.add_argument('--loss_type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
     parser.add_argument('--max_steps', type=int, default=0, help='max training batches')
-    parser.add_argument('--network', default='r100', help='specify network')
+    # parser.add_argument('--network', default='r100', help='specify network')
     parser.add_argument('--image-size', default='112,112', help='specify input image height and width')
     parser.add_argument('--version-se', type=int, default=0, help='whether to use se in network')
     parser.add_argument('--version-input', type=int, default=1, help='network input config 1代表第一次卷积7x7-2改为3x3-1')
@@ -170,7 +176,6 @@ def parse_args():
     parser.add_argument("--fc7-no-bias", default=False, action="store_true", help="fc7 no bias flag")
     parser.add_argument('--bn-mom', type=float, default=0.9, help='bn mom')
     parser.add_argument('--mom', type=float, default=0.9, help='momentum')
-    parser.add_argument('--emb-size', type=int, default=512, help='embedding length')
     parser.add_argument('--margin-m', type=float, default=0.5, help='margin for loss,')
     parser.add_argument('--margin-s', type=float, default=64.0, help='scale for feature')
     parser.add_argument('--margin-a', type=float, default=1.0, help='')
@@ -516,7 +521,8 @@ def train_net(args):
         vec = args.pretrained.split(',')
         logging.info('loading %s', vec)
         sym, arg_params, aux_params = mx.model.load_checkpoint(vec[0], int(vec[1]))
-        logging.info("fc7_weight norm %s", mx.nd.norm(arg_params['fc7_weight'], axis=1).mean())
+        if "fc7_weight" in arg_params:
+            logging.info("fc7_weight norm %s", mx.nd.norm(arg_params['fc7_weight'], axis=1).mean())
         if args.load_weight:
             arg_params['fc7_weight'] = dataset.label_features()
         sym, arg_params, aux_params = get_symbol(args, arg_params, aux_params)
@@ -579,18 +585,12 @@ def train_net(args):
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         lr_steps = [8, 12, 16]
-        lr_steps = [2, 6, 10]
-        lr_steps = [2, 6]
-        lr_steps = [6, 9, 12]
-        lr_steps = [5, 8, 11]
-        lr_steps = [1]
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
     if len(lr_steps) == 1:
         end_epoch = 2 * lr_steps[-1]
     else:
         end_epoch = 2 * lr_steps[-1] - lr_steps[-2]
-    end_epoch = 1
     epoch_sizes = [int(dataset.pic_len / args.batch_size)] * end_epoch
     args.max_steps = np.sum(epoch_sizes)
     args.lr_steps = lr_steps
@@ -630,13 +630,13 @@ def train_net(args):
         cos_t = model.get_outputs()[4].asnumpy()
         cos_ts.append(cos_t)
         # logging.info("cos_t %s ", cos_t)
-        if nbatch % 1000 == 0:
+        if global_batch % 1000 == 0:
             cos_t_cur = np.concatenate(cos_ts)
             # bins = list(range(100))
             # bins = [b / 100 for b in bins]
             bins = 1000
             sw.add_histogram(tag="cos_t", values=cos_t_cur, global_step=global_batch, bins=bins)
-            cal_noise(cos_t_cur, nbatch)
+            cal_noise(cos_t_cur, global_batch)
 
         if nbatch != 0 and nbatch % 20 == 0:
             acc = param.eval_metric.get_name_value()[0][1]
@@ -689,6 +689,8 @@ def train_net(args):
         global_step[0] += 1
 
     def epoch_cb(epoch, symbol, arg, aux):
+        # 清理历史列表
+        cos_ts.clear()
         logging.info("================>epoch_cb epoch %s g_step %s args.lr_steps %s", epoch, global_step[0], args.lr_steps)
         _lr_steps = [step - 1 for step in args.lr_steps]
         for _lr in _lr_steps:
