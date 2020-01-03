@@ -140,7 +140,7 @@ def parse_args():
 
     parser.add_argument('--load_weight', type=int, default=1, help='重新加载feature')
     parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
-    parser.add_argument('--per_batch_size', type=int, default=48, help='batch size in each context')
+    parser.add_argument('--per_batch_size', type=int, default=64, help='batch size in each context')
 
 
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
@@ -153,10 +153,10 @@ def parse_args():
     # parser.add_argument('--pretrained', default='./train/v26_2019-12-18-21:18:18/model,4', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/v26_2019-12-20-17:26:24/model,9', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/v28_2019-12-25-10:26:16/model,2', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='./train/model-r34-amf/model,0', help='pretrained model to load')
-    # parser.add_argument('--pretrained', default='', help='pretrained model to load')
+    # parser.add_argument('--pretrained', default='./train/model-r34-amf/model,0', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='', help='pretrained model to load')
 
-    parser.add_argument('--network', default='r34', help='specify network')
+    parser.add_argument('--network', default='y2', help='specify network')
     parser.add_argument('--emb-size', type=int, default=512, help='embedding length')
     parser.add_argument('--loss_type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
     parser.add_argument('--max_steps', type=int, default=0, help='max training batches')
