@@ -8,6 +8,7 @@ import logging
 import math
 import os
 import sys
+from collections import defaultdict
 
 import mxnet as mx
 import mxnet.optimizer as optimizer
@@ -138,10 +139,9 @@ def parse_args():
     target = os.path.expanduser("~/datasets/maysa/lfw.bin")
     parser.add_argument('--target', type=str, default=target, help='verification targets')
 
-    parser.add_argument('--load_weight', type=int, default=1, help='重新加载feature')
+    parser.add_argument('--load_weight', type=int, default=0, help='重新加载feature')
     parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
     parser.add_argument('--per_batch_size', type=int, default=64, help='batch size in each context')
-
 
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models/model-r34-7-19/model,172000', help='pretrained model to load')
@@ -154,7 +154,8 @@ def parse_args():
     # parser.add_argument('--pretrained', default='./train/v26_2019-12-20-17:26:24/model,9', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/v28_2019-12-25-10:26:16/model,2', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/model-r34-amf/model,0', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='./train/noise_2020-01-03-14:04:50/model,0', help='pretrained model to load')
+    # parser.add_argument('--pretrained', default='', help='pretrained model to load')
 
     parser.add_argument('--network', default='y2', help='specify network')
     parser.add_argument('--emb-size', type=int, default=512, help='embedding length')
@@ -598,30 +599,75 @@ def train_net(args):
 
     cos_ts = []
 
-    def cal_noise(cos_t_cur, nbatch):
-        # cos_t_cur.sort()
-        # n2 = np.zeros_like(cos_t_cur)
-        # for index in range(len(n2)):
-        #     start = max(0, index - 2)
-        #     end = min(len(n2), index + 2)
-        #     n2[index] = np.mean(cos_t_cur[start:end])
-        # bin_dict = {}
-        # for b in range(1000):
-        #     bin_dict[b / 1000] = 0
-        # for n in n2:
-        #     n = int(n * 1000) / 1000
-        #     if n == 1:
-        #         n == 0.999
-        #     bin_dict[n] += 1
-        # logging.info("bin_dict %s", bin_dict)
-
+    def save_png(cos_t_cur, end_str):
         import matplotlib.pyplot as plt
         plt.figure(figsize=(20, 8))
         ###绘图
         plt.hist(cos_t_cur, bins=1000, color='g')
         plt.title('余弦直方图')
         ###保存
-        plt.savefig("{}/plt_{}.jpg".format(file_path, nbatch))
+        plt.savefig("{}/plt_{}.jpg".format(file_path, end_str))
+
+    def save_mean_png(cos_t_cur, end_str):
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(20, 8))
+        ###绘图
+        x = np.arange(len(cos_t_cur))
+        plt.plot(x, cos_t_cur, color="red", linewidth=1)
+        plt.title('余弦柱状图')
+        ###保存
+        plt.savefig("{}/plt_mean_{}.jpg".format(file_path, end_str))
+
+    def cal_thes(n2, end_str):
+        sigm_l_th = int(len(n2) * 0.005)
+        sigm_l = n2[sigm_l_th]
+        sigm_r = n2[-sigm_l_th]
+        logging.info("sigm_l %s sigm_r %s", sigm_l, sigm_r)
+
+        bins = 1000
+        bin_dict = defaultdict(int)
+        for n in n2:
+            if n < 0 or n > 1:
+                continue
+            n = int(n * 1000)
+            if n == bins:
+                n == bins - 1
+            bin_dict[n] += 1
+
+        n2 = np.zeros(bins)
+        for index in range(bins):
+            n2[index] = bin_dict[index]
+        n2_copy = n2.copy()
+        for index in range(bins):
+            start = max(0, index - 2)
+            end = min(bins, index + 2)
+            n2[index] = np.mean(n2_copy[start:end])
+
+        save_mean_png(n2, end_str)
+        max_thes = []
+        max_counts = []
+        for th in range(bins):
+            if 5 <= th <= bins - 6:
+                is_max = True
+                for i in range(11):
+                    cur = bin_dict[th - 5 + i]
+                    if cur == 0 or cur > bin_dict[th]:
+                        is_max = False
+                        break
+                if is_max:
+                    max_thes.append(th * 0.001)
+                    max_counts.append(n2[th])
+        logging.info("max_thes %s max_counts %s", max_thes, max_counts)
+
+    def cal_noise(cos_t_cur, nbatch):
+        save_png(cos_t_cur, nbatch)
+        cos_t_cur.sort()
+        cal_thes(cos_t_cur, nbatch)
+
+    def cal_noise_end(cos_t_all, epoch):
+        save_png(cos_t_all, "epoch_{}".format(epoch))
+        cos_t_all.sort()
+        cal_thes(cos_t_all, "epoch_{}".format(epoch))
 
     def _batch_callback(param):
         nbatch = param.nbatch
@@ -690,6 +736,8 @@ def train_net(args):
 
     def epoch_cb(epoch, symbol, arg, aux):
         # 清理历史列表
+        cos_t_all = np.concatenate(cos_ts)
+        cal_noise_end(cos_t_all, epoch)
         cos_ts.clear()
         logging.info("================>epoch_cb epoch %s g_step %s args.lr_steps %s", epoch, global_step[0], args.lr_steps)
         _lr_steps = [step - 1 for step in args.lr_steps]
@@ -721,17 +769,17 @@ def train_net(args):
         # 100 500w
         # 改变学习率的第一个epoch不变
         #
-        if epoch == 0:
-            dataset.max_images = 10
-            dataset.reset()
-        if epoch == 1:
-            dataset.max_images = 300
-            dataset.reset()
-        # 下一个epoch才生效
-        for index in range(epoch + 1, end_epoch):
-            epoch_sizes[index] = int(dataset.pic_len / args.batch_size)
-        args.max_steps = np.sum(epoch_sizes)
-        logging.info("================>change max_images to %s epoch %s g_step %s max_steps %s epoch_sizes %s ", dataset.max_images, epoch, global_step[0], epoch_sizes, args.max_steps)
+        # if epoch == 0:
+        #     dataset.max_images = 10
+        #     dataset.reset()
+        # if epoch == 1:
+        #     dataset.max_images = 300
+        #     dataset.reset()
+        # # 下一个epoch才生效
+        # for index in range(epoch + 1, end_epoch):
+        #     epoch_sizes[index] = int(dataset.pic_len / args.batch_size)
+        # args.max_steps = np.sum(epoch_sizes)
+        # logging.info("================>change max_images to %s epoch %s g_step %s max_steps %s epoch_sizes %s ", dataset.max_images, epoch, global_step[0], epoch_sizes, args.max_steps)
 
     # train_dataiter = mx.io.PrefetchingIter(train_dataiter)
     model.fit(train_dataiter,
