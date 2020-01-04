@@ -178,11 +178,11 @@ def parse_args():
     parser.add_argument("--fc7-no-bias", default=False, action="store_true", help="fc7 no bias flag")
     parser.add_argument('--bn-mom', type=float, default=0.9, help='bn mom')
     parser.add_argument('--mom', type=float, default=0.9, help='momentum')
-    parser.add_argument('--margin-m', type=float, default=0.5, help='margin for loss,')
+    parser.add_argument('--margin_m', type=float, default=0.5, help='margin for loss,')
     parser.add_argument('--margin-s', type=float, default=64.0, help='scale for feature')
     parser.add_argument('--margin-a', type=float, default=1.0, help='')
     parser.add_argument('--margin-b', type=float, default=0.2, help='')
-    parser.add_argument('--easy-margin', type=int, default=0, help='')
+    parser.add_argument('--easy_margin', type=int, default=0, help='')
     parser.add_argument('--margin', type=int, default=4, help='margin for sphere')
     parser.add_argument('--beta', type=float, default=1000., help='param for sphere')
     parser.add_argument('--beta-min', type=float, default=5., help='param for sphere')
@@ -320,6 +320,8 @@ def get_symbol(args, arg_params, aux_params):
         gt_one_hot = mx.sym.one_hot(gt_label, depth=args.num_classes, on_value=1.0, off_value=0.0)
         body = mx.sym.broadcast_mul(gt_one_hot, diff)
         fc7 = fc7 + body
+        # noise_tolerant
+
     elif args.loss_type == 5:
         s = args.margin_s
         m = args.margin_m
