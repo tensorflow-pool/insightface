@@ -123,7 +123,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train face network')
 
     # leveldb_path = os.path.expanduser("~/datasets/cacher/pictures")
-    leveldb_path = os.path.expanduser("/opt/cacher/faces_webface_112x112")
+    leveldb_path = os.path.expanduser("~/datasets/cacher/pictures")
     parser.add_argument('--leveldb_path', default=leveldb_path, help='training set directory')
     # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.05_30")
     # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.40/pictures.labels.40.38_39")
@@ -136,13 +136,13 @@ def parse_args():
     # 0.6合并的,并且合并了剩余的，并踢出了0.5merge的(现在都清理了白鹭郡等所有测试数据)
 
     # label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.35/left_pictures.labels.35.33_34.processed.v16")
-    label_path = os.path.expanduser("/opt/cacher/faces_webface_112x112.labels")
+    label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.35/left_pictures.labels.35.33_34.processed.v16")
     parser.add_argument('--label_path', default=label_path, help='training set directory')
     target = os.path.expanduser("~/datasets/maysa/lfw.bin")
     parser.add_argument('--target', type=str, default=target, help='verification targets')
 
     parser.add_argument('--load_weight', type=int, default=0, help='重新加载feature')
-    parser.add_argument('--lr', type=float, default=0.0001, help='start learning rate')
+    parser.add_argument('--lr', type=float, default=0.00001, help='start learning rate')
     parser.add_argument('--per_batch_size', type=int, default=16, help='batch size in each context')
 
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
@@ -157,7 +157,7 @@ def parse_args():
     # parser.add_argument('--pretrained', default='./train/v28_2019-12-25-10:26:16/model,2', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/model-r34-amf/model,0', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/noise_2020-01-03-17:39:14/model,9', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='./train/v28_2019-12-25-15:26:45/model,8', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='./train/v26_2019-12-20-17:26:24,9', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='', help='pretrained model to load')
 
     parser.add_argument('--network', default='r100', help='specify network')
@@ -493,21 +493,8 @@ def train_net(args):
         args.beta_freeze = 5000
         args.gamma = 0.06
 
-    # data_shape = (args.image_channel, image_size[0], image_size[1])
-    # dataset = FaceDataset(args.leveldb_path, args.label_path, leveldb_feature_path=os.path.expanduser("~/datasets/cacher/features"), min_images=10, max_images=3000000, ignore_labels={0})
-
     data_shape = (args.image_channel, image_size[0], image_size[1])
-    leveldb_path = os.path.expanduser("~/datasets/cacher/pictures")
-    label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.35/left_pictures.labels.35.33_34.processed.v16")
-    dataset1 = FaceDataset(leveldb_path, label_path, leveldb_feature_path=os.path.expanduser("~/datasets/cacher/features"), min_images=10, max_images=5, ignore_labels={0})
-
-    leveldb_path = os.path.expanduser("~/datasets/cacher/ms1m-retina")
-    label_path = os.path.expanduser("~/datasets/cacher/ms1m-retina.labels")
-    dataset2 = FaceDataset(leveldb_path, label_path, min_images=10, max_images=5, ignore_labels={0})
-
-    dataset = ListDataset(dataset1, dataset2)
-    logging.info("dataset %s/%s", dataset.label_len, dataset.data_len)
-
+    dataset = FaceDataset(args.leveldb_path, args.label_path, min_images=10, max_images=300, ignore_labels={0})
     logging.info("dataset %s/%s", dataset.label_len, dataset.data_len)
     train_dataiter = FaceImageIter(
         batch_size=args.batch_size,
@@ -539,7 +526,7 @@ def train_net(args):
         if "fc7_weight" in arg_params:
             logging.info("fc7_weight norm %s", mx.nd.norm(arg_params['fc7_weight'], axis=1).mean())
         if args.load_weight:
-            arg_params['fc7_weight'] = dataset.label_features()
+            arg_params['fc7_weight'] = dataset.label_features()label_path
         sym, arg_params, aux_params = get_symbol(args, arg_params, aux_params)
 
     # label_name = 'softmax_label'
