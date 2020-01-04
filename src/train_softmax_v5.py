@@ -143,7 +143,7 @@ def parse_args():
 
     parser.add_argument('--load_weight', type=int, default=0, help='重新加载feature')
     parser.add_argument('--lr', type=float, default=0.0001, help='start learning rate')
-    parser.add_argument('--per_batch_size', type=int, default=64, help='batch size in each context')
+    parser.add_argument('--per_batch_size', type=int, default=16, help='batch size in each context')
 
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='../models/model-r34-7-19/model,172000', help='pretrained model to load')
@@ -600,13 +600,14 @@ def train_net(args):
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         lr_steps = [8, 12, 16]
-        lr_steps = [3]
+        lr_steps = [1]
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
     if len(lr_steps) == 1:
         end_epoch = 2 * lr_steps[-1]
     else:
         end_epoch = 2 * lr_steps[-1] - lr_steps[-2]
+    end_epoch = 1
     epoch_sizes = [int(dataset.pic_len / args.batch_size)] * end_epoch
     args.max_steps = np.sum(epoch_sizes)
     args.lr_steps = lr_steps
@@ -688,7 +689,7 @@ def train_net(args):
         cos_ts.append(cos_t)
         # logging.info("cos_t %s ", cos_t)
         if global_batch % 1000 == 0:
-            cos_t_cur = np.concatenate(cos_ts[-1000:])
+            cos_t_cur = np.concatenate(cos_ts[-10000:])
             # bins = list(range(100))
             # bins = [b / 100 for b in bins]
             bins = 100
@@ -750,7 +751,7 @@ def train_net(args):
         # 清理历史列表
         cos_t_all = np.concatenate(cos_ts)
         cal_noise_end(cos_t_all, epoch)
-        cos_ts = cos_ts[-1000:]
+        cos_ts = cos_ts[-10000:]
         logging.info("================>epoch_cb epoch %s g_step %s args.lr_steps %s", epoch, global_step[0], args.lr_steps)
         _lr_steps = [step - 1 for step in args.lr_steps]
         for _lr in _lr_steps:
