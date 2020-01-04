@@ -14,7 +14,7 @@ import mxnet as mx
 import mxnet.optimizer as optimizer
 import numpy as np
 
-from image_dataset import FaceImageIter, FaceDataset
+from image_dataset import FaceImageIter, FaceDataset, ListDataset
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'common'))
 import git
@@ -38,6 +38,7 @@ from mxboard import SummaryWriter
 args = None
 
 cos_ts = []
+
 
 class AccMetric(mx.metric.EvalMetric):
     def __init__(self, real=False):
@@ -155,10 +156,11 @@ def parse_args():
     # parser.add_argument('--pretrained', default='./train/v26_2019-12-20-17:26:24/model,9', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/v28_2019-12-25-10:26:16/model,2', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/model-r34-amf/model,0', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='./train/noise_2020-01-03-17:39:14/model,9', help='pretrained model to load')
+    # parser.add_argument('--pretrained', default='./train/noise_2020-01-03-17:39:14/model,9', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='./train/v28_2019-12-25-15:26:45/model,8', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='', help='pretrained model to load')
 
-    parser.add_argument('--network', default='y2', help='specify network')
+    parser.add_argument('--network', default='r100', help='specify network')
     parser.add_argument('--emb-size', type=int, default=512, help='embedding length')
     parser.add_argument('--loss_type', type=int, default=4, help='loss type 5的时候为cos(margin_a*θ+margin_m) - margin_b;cos(θ+0.3)-0.2 or cos(θ+0.5)')
     parser.add_argument('--max_steps', type=int, default=0, help='max training batches')
@@ -447,8 +449,6 @@ def get_symbol(args, arg_params, aux_params):
     return (out, arg_params, aux_params)
 
 
-
-
 def train_net(args):
     branch_name = git.Repo("..").active_branch.name
     prefix = time.strftime("%Y-%m-%d-%H:%M:%S")
@@ -493,12 +493,21 @@ def train_net(args):
         args.beta_freeze = 5000
         args.gamma = 0.06
 
+    # data_shape = (args.image_channel, image_size[0], image_size[1])
+    # dataset = FaceDataset(args.leveldb_path, args.label_path, leveldb_feature_path=os.path.expanduser("~/datasets/cacher/features"), min_images=10, max_images=3000000, ignore_labels={0})
+
     data_shape = (args.image_channel, image_size[0], image_size[1])
-    dataset = FaceDataset(args.leveldb_path, args.label_path, leveldb_feature_path=os.path.expanduser("~/datasets/cacher/features"), min_images=10, max_images=3000000, ignore_labels={0})
-    # leveldb_path = os.path.expanduser("~/datasets/cacher/ms1m-retina")
-    # label_path = os.path.expanduser("~/datasets/cacher/ms1m-retina.labels")
-    # dataset2 = FaceDataset(leveldb_path, label_path, min_images=10, max_images=5, ignore_labels={0})
-    # dataset = ListDataset(dataset1, dataset2)
+    leveldb_path = os.path.expanduser("~/datasets/cacher/pictures")
+    label_path = os.path.expanduser("~/datasets/cacher/pictures.labels.35/left_pictures.labels.35.33_34.processed.v16")
+    dataset1 = FaceDataset(leveldb_path, label_path, leveldb_feature_path=os.path.expanduser("~/datasets/cacher/features"), min_images=10, max_images=5, ignore_labels={0})
+
+    leveldb_path = os.path.expanduser("~/datasets/cacher/ms1m-retina")
+    label_path = os.path.expanduser("~/datasets/cacher/ms1m-retina.labels")
+    dataset2 = FaceDataset(leveldb_path, label_path, min_images=10, max_images=5, ignore_labels={0})
+
+    dataset = ListDataset(dataset1, dataset2)
+    logging.info("dataset %s/%s", dataset.label_len, dataset.data_len)
+
     logging.info("dataset %s/%s", dataset.label_len, dataset.data_len)
     train_dataiter = FaceImageIter(
         batch_size=args.batch_size,
