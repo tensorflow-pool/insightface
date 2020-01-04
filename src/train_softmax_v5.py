@@ -141,7 +141,7 @@ def parse_args():
     parser.add_argument('--target', type=str, default=target, help='verification targets')
 
     parser.add_argument('--load_weight', type=int, default=0, help='重新加载feature')
-    parser.add_argument('--lr', type=float, default=0.001, help='start learning rate')
+    parser.add_argument('--lr', type=float, default=0.0001, help='start learning rate')
     parser.add_argument('--per_batch_size', type=int, default=64, help='batch size in each context')
 
     # parser.add_argument('--pretrained', default='../models/model-r100-ii-1-16/model,29', help='pretrained model to load')
@@ -155,7 +155,7 @@ def parse_args():
     # parser.add_argument('--pretrained', default='./train/v26_2019-12-20-17:26:24/model,9', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/v28_2019-12-25-10:26:16/model,2', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='./train/model-r34-amf/model,0', help='pretrained model to load')
-    parser.add_argument('--pretrained', default='./train/noise_2020-01-03-16:22:34/model,2', help='pretrained model to load')
+    parser.add_argument('--pretrained', default='./train/noise_2020-01-03-17:39:14/model,9', help='pretrained model to load')
     # parser.add_argument('--pretrained', default='', help='pretrained model to load')
 
     parser.add_argument('--network', default='y2', help='specify network')
@@ -589,6 +589,7 @@ def train_net(args):
         # if args.loss_type >= 1 and args.loss_type <= 7:
         #     lr_steps = [100000, 140000, 160000]
         lr_steps = [8, 12, 16]
+        lr_steps = [3]
     else:
         lr_steps = [int(x) for x in args.lr_steps.split(',')]
     if len(lr_steps) == 1:
