@@ -314,7 +314,7 @@ def residual_unit_v2(data, num_filter, stride, dim_match, name, bottle_neck, **k
             shortcut._set_attr(mirror_stage='True')
         return conv2 + shortcut
 
-
+#body, filter_list[i + 1], (2, 2), False,
 def residual_unit_v3(data, num_filter, stride, dim_match, name, bottle_neck, **kwargs):
     """Return ResNet Unit symbol for building ResNet
     Parameters
@@ -471,7 +471,7 @@ def residual_unit_v3_x(data, num_filter, stride, dim_match, name, bottle_neck, *
         shortcut._set_attr(mirror_stage='True')
     return bn4 + shortcut
 
-
+#body, filter_list[i + 1], (2, 2), False,
 def residual_unit(data, num_filter, stride, dim_match, name, bottle_neck, **kwargs):
     uv = kwargs.get('version_unit', 3)
     version_input = kwargs.get('version_input', 1)

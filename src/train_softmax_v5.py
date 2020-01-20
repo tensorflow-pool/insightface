@@ -17,6 +17,7 @@ from image_dataset import FaceImageIter, FaceDataset, ListDataset
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'common'))
 import git
+
 sys.path.append(os.path.join(os.path.dirname(__file__), 'eval'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'symbols'))
 import fresnet
@@ -135,6 +136,7 @@ def parse_args():
     parser.add_argument('--target', type=str, default=target, help='verification targets')
 
     parser.add_argument('--load_weight', type=int, default=1, help='重新加载feature')
+    parser.add_argument('--del_weight', type=int, default=1, help='重新加载feature')
     parser.add_argument('--lr', type=float, default=0.01, help='start learning rate')
     parser.add_argument('--per_batch_size', type=int, default=48, help='batch size in each context')
 
@@ -481,7 +483,7 @@ def train_net(args):
         args.gamma = 0.06
 
     data_shape = (args.image_channel, image_size[0], image_size[1])
-    dataset1 = FaceDataset(args.leveldb_path, args.label_path, leveldb_feature_path=os.path.expanduser("~/datasets/cacher/features"),  min_images=10, max_images=5, ignore_labels={0})
+    dataset1 = FaceDataset(args.leveldb_path, args.label_path, leveldb_feature_path=os.path.expanduser("~/datasets/cacher/features"), min_images=10, max_images=5, ignore_labels={0})
     leveldb_path = os.path.expanduser("~/datasets/cacher/ms1m-retina")
     label_path = os.path.expanduser("~/datasets/cacher/ms1m-retina.labels")
     dataset2 = FaceDataset(leveldb_path, label_path, min_images=10, max_images=5, ignore_labels={0})
@@ -514,7 +516,10 @@ def train_net(args):
         vec = args.pretrained.split(',')
         logging.info('loading %s', vec)
         sym, arg_params, aux_params = mx.model.load_checkpoint(vec[0], int(vec[1]))
+        logging.info('pre_fc1_weight %s', arg_params['pre_fc1_weight'].shape)
         logging.info("fc7_weight norm %s", mx.nd.norm(arg_params['fc7_weight'], axis=1).mean())
+        if args.del_weight:
+            del arg_params['fc7_weight']
         if args.load_weight:
             arg_params['fc7_weight'] = dataset.label_features()
         sym, arg_params, aux_params = get_symbol(args, arg_params, aux_params)
